@@ -37,10 +37,10 @@ function [data] = SpecialTreatmentCP1(data)
 %         legend('CP1','CP2','Swiss Camp')
 %         ylabel('Downward Radiation (W/m2)')
 
-        ind = find(ind_CP1);
-        data(ind+7,5:35) = data(ind,5:35);
-        data(ind(1):ind(1)+7,5:35)= array2table(NaN(8,31));
-        clearvars ind_CP1 diff ind
+%         ind = find(ind_CP1);
+%         data(ind+7,5:35) = data(ind,5:35);
+%         data(ind(1):ind(1)+7,5:35)= array2table(NaN(8,31));
+%         clearvars ind_CP1 diff ind
 
 %         subplot(2,1,2)
 %         ind_CP1 = and(data.time>datenum('27-May-1999'), data.time<datenum('03-Jun-2000'));
@@ -57,4 +57,15 @@ function [data] = SpecialTreatmentCP1(data)
 %         legend('CP1','CP2','Swiss Camp')
 %         ylabel('Downward Radiation (W/m2)')
 
+%% Shifting temperature / pressure
+    data.AirTemperature1C(data.AirTemperature1C<-200) = ...
+        data.AirTemperature1C(data.AirTemperature1C<-200)+273.15;
+    data.AirTemperature2C(data.AirTemperature2C<-200) = ...
+        data.AirTemperature2C(data.AirTemperature2C<-200)+273.15;
+    data.AirTemperature3C(data.AirTemperature3C<-200) = ...
+        data.AirTemperature3C(data.AirTemperature3C<-200)+273.15;
+    data.AirTemperature4C(data.AirTemperature4C<-200) = ...
+        data.AirTemperature4C(data.AirTemperature4C<-200)+273.15;
+    data.AirPressurehPa(data.AirPressurehPa<100) = data.AirPressurehPa(data.AirPressurehPa<100)+791.6;
+    data.AirPressurehPa(data.AirPressurehPa>1000) = data.AirPressurehPa(data.AirPressurehPa>1000) - 389.9;
 end

@@ -1,12 +1,63 @@
 function data = TreatAndFilterData(data, opt, station,OutputFolder,vis)
-% Basic data processing and filtering
+% data processing and filtering
 
 % in the text files missing data is either 999 or -999
 % we change them into Matlab's 'NaN'
 data = standardizeMissing(data,{999,-999});
-
-%% Resampling at each round hour to synchronize all stations   
 data = ResampleTable(data);
+
+%% Site specific modification
+    switch station
+        case 'CP1'
+            [data] = SpecialTreatmentCP1(data);
+            % When generating the CP1 data, the surface height from CP2 is being used.
+            % This is the only station where surface height is reconstructed from
+            % another location. For all the other station the output from HIRHHAM5 will
+            % be used instead
+            disp('Recover Surface Height From CP2')
+            tic
+            data = RecoverSurfaceHeightFromCP2(data,'CP2',OutputFolder,vis);
+            toc
+        case 'DYE-2'
+            DV  = datevec(data.time);  % [N x 6] array
+
+            ind2 = and(DV(:,4)>=21,DV(:,4)<=23);
+            ind = and(ind2,data.time>= datenum('01-Jan-2014'));
+            data.ShortwaveRadiationDownWm2(ind)=NaN;  
+            
+            ind1= find(data.time==datenum('15-May-2014'));
+            ind2= find(data.time==datenum('22-Apr-2016'));
+            data.AirPressurehPa(ind1:ind2) = data.AirPressurehPa(ind1:ind2)-198.8;
+                        
+            ind1= find(data.time==datenum('20-Oct-2016'));
+            data.AirPressurehPa(ind1:end) = data.AirPressurehPa(ind1:end)-198.8;
+            data.AirPressurehPa(data.AirPressurehPa>825) = NaN;
+        case 'NASA-SE'
+            ind1= find(data.time==datenum('01-May-2017'));
+            data.AirPressurehPa(ind1:end) = data.AirPressurehPa(ind1:end)+404;
+        
+        case 'Summit'
+          ind1= find(data.time==datenum( '02-May-2017'));
+            data.AirPressurehPa(ind1:end) = data.AirPressurehPa(ind1:end)-50;
+        case 'NUK_K'
+            %measured snow thickness at installation
+            data.SnowHeight2m=data.SnowHeight2m+1.56;
+            [data] = SpecialTreatmentNUK_K(data);
+
+        case 'NASA-U'
+            [data] = SpecialTreatmentNASAU(data);
+        case 'Saddle'
+            data(find(abs(data.time-datenum('23-May-2013 13:59:57'))<1/24),:) =...
+                [];
+            ind1= find(data.time==datenum('01-May-2017'));
+            data.AirPressurehPa(ind1:end) = data.AirPressurehPa(ind1:end)+404;    end
+    
+%% Correcting radiation
+% Suggested at some point by Robert
+%     disp('correcting Radiation'
+% tic
+%     data = CorrectingRadiation(data,station,vis);
+% toc
 
 %% converting humidity
 % The instruments on PROMICE stations or HIRHAM model normally give 
@@ -26,38 +77,154 @@ if strcmp(opt,'ConvertHumidity')
     clearvars  RH_wrt_i T pres
 end
 
+%% Plotting before removal
+    var_name = {'ShortwaveRadiationDownWm2','ShortwaveRadiationUpWm2',...
+    'AirTemperature1C','AirTemperature2C','AirTemperature3C','AirTemperature4C',...
+    'RelativeHumidity1Perc','RelativeHumidity2Perc','AirPressurehPa',...
+    'WindSpeed1ms','WindSpeed2ms','SnowHeight1m','SnowHeight2m'};
+    
+    var_name_short={'swrd','swru','ta1','ta2','ta3','ta4',...
+        'rh1','rh2','ps','ws1','ws2','hs1','hs2'};
+    
+    f = figure('Visible',vis);%,'outerposition',[0 0 30 40]);
+    
+    count = 0;
+    for i = 1:length(var_name)
+        if ismember(var_name{i},data.Properties.VariableNames)
+            count = count+1;
+        end
+    end
+        
+    ha = tight_subplot(count,1,0.02, [0.05 0.02],[0.07 0.25]);
+    
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('red'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('red'))
+        end
+        hold on
+        if i == 1           
+            h_tit = title(station);
+            h_tit.Units = 'normalized';
+            h_tit.Position(2) = h_tit.Position(2)-2;
+            h_tit.Position(1) = h_tit.Position(1)+ 0.6;
+        end
+        axis tight
+        set_monthly_tick(data.time)
+        tmp = get(gca,'XTickLabel');
+        set(gca,'XTickLabel','')
+    end
+        set(gca,'XTickLabel',tmp)
+    
+%% Applying jaws qc code
+    ind_qc = find(contains(data.Properties.VariableNames,'qc'));
+
+if ~isempty(ind_qc)
+%     qc_name = {data.Properties.VariableNames{ind_qc}}';
+%     qc_name(1:4) = [];
+    
+    qc_name = {'qc_swdn','qc_swup','qc_ttc1','qc_ttc2','qc_tcs1','qc_tcs2',...
+        'qc_rh1','qc_rh2','qc_pressure','qc_u1','qc_u2'};
+
+% Assignment of Codes
+% �  code = 0 is not used
+% �  code = 1 unmodified data
+% �  code = 2 linearly interpolated. For snow height missing data replaced
+%               with the last available data point.
+% �  code = 3 'frozen' e.g. with wind direction when the anemometer is frosted over with the exact
+% same value for more than 4 hours.
+% �  code = 5 SWin>SWdown
+% �  code = 6 corresponds to synthetic wind values. When one WS is not available
+%               its value is caluclated from the available level using
+%               logarithmic slope-intercept formula is used assuming a 
+%               roughness length of 5cm (average condition).
+% �  code = 7 corresponds to those cases where aerodynamic theory agreed with the measured logarithmic profile
+% above r^2 = 0.97 . In these cases, the theory is selected to predict the 2 and 10 m wind speeds.
+% �  code = 8 represents cases when RH data are used to estimate temperatures below -50 C. Note that RH is
+% saturated at temperatures less than -45 C and hence the RH values are a direct function of temperature. This
+% method has r squared values between 0.8 and 0.98.
+% �  code = 9 when temperature values have been corrected for overheating when wind is small and solar
+% radiation is great.
+% �  code = 9 for some of the 1997 and 1998 Crawford Point snow height data that were synthesized from the
+% regression based on the overlap with CP 2 data.
+
+    for i = 1:length(qc_name)       
+        data.(var_name{i})(ismember(data.(qc_name{i}),[2])) = NaN;
+    end
+end
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('cyan'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('cyan'))
+        end
+        ylabel(var_name_short{i})
+    end
+    
 %% some filters for unlikely values
-data.ShortwaveRadiationDownWm2(data.ShortwaveRadiationDownWm2<0) = NaN;
-data.ShortwaveRadiationDownWm2(data.ShortwaveRadiationDownWm2>950) = NaN;
-data.ShortwaveRadiationUpWm2(data.ShortwaveRadiationUpWm2<0) = NaN;
-data.ShortwaveRadiationUpWm2(data.ShortwaveRadiationUpWm2>950) = NaN;
-data.ShortwaveRadiationUpWm2(data.ShortwaveRadiationUpWm2>data.ShortwaveRadiationDownWm2) = NaN;
+
+data = MaxMinFilter(data, 'AirPressurehPa', 700, 1000);
+
+data = MaxMinFilter(data, 'ShortwaveRadiationDownWm2', 0, 950);
+data = MaxMinFilter(data, 'ShortwaveRadiationUpWm2', 0, 950);
+data.ShortwaveRadiationUpWm2...
+    (data.ShortwaveRadiationUpWm2>data.ShortwaveRadiationDownWm2) = NaN;
 data.ShortwaveRadiationUpWm2(isnan(data.ShortwaveRadiationDownWm2)) = NaN;
 
-if ismember('NetRadiationWm2',data.Properties.VariableNames)
-data.NetRadiationWm2(data.NetRadiationWm2<-500) = NaN;
-end
-data.RelativeHumidity1Perc(data.RelativeHumidity1Perc<0) = NaN;
-data.RelativeHumidity2Perc(data.RelativeHumidity2Perc<0) = NaN;
-% data.RelativeHumidity1Perc(data.RelativeHumidity1Perc<40)=NaN;
-% data.RelativeHumidity2Perc(data.RelativeHumidity1Perc<40)=NaN;
-data.RelativeHumidity1Perc(data.RelativeHumidity1Perc>100) = 100;
-data.RelativeHumidity2Perc(data.RelativeHumidity2Perc>100) = 100;
+data = MaxMinFilter(data, 'NetRadiationWm2', -500, 10000);
+  
+T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+data.rh1 = RHice2water(data.RelativeHumidity1Perc,T+273.15,data.AirPressurehPa);
+T = nanmean([data.AirTemperature2C, data.AirTemperature4C],2);
+data.rh2 = RHice2water(data.RelativeHumidity2Perc,T+273.15,data.AirPressurehPa);
+   
+data = MaxMinFilter(data, 'rh1', 40, 100);
+data = MaxMinFilter(data, 'rh2', 40, 100);
+data.RelativeHumidity1Perc(isnan(data.rh1)) = NaN;
+data.RelativeHumidity2Perc(isnan(data.rh2)) = NaN;
 
-data.AirTemperature1C(data.AirTemperature1C<-70) = NaN;
-data.AirTemperature1C(data.AirTemperature1C>40) = NaN;
-data.AirTemperature2C(data.AirTemperature2C<-70) = NaN;
-data.AirTemperature2C(data.AirTemperature2C>40) = NaN;
-data.AirTemperature3C(data.AirTemperature3C<-70) = NaN;
-data.AirTemperature3C(data.AirTemperature3C>40) = NaN;
-data.AirTemperature4C(data.AirTemperature4C<-70) = NaN;
-data.AirTemperature4C(data.AirTemperature4C>40) = NaN;
-data.AirTemperature3C(data.AirTemperature3C<=-39) = NaN;
-data.AirTemperature4C(data.AirTemperature4C<=-39) = NaN;
+data = MaxMinFilter(data, 'AirTemperature1C', -70, 40);
+data = MaxMinFilter(data, 'AirTemperature2C', -70, 40);
+data = MaxMinFilter(data, 'AirTemperature3C', -39, 40);
+data = MaxMinFilter(data, 'AirTemperature4C', -39, 40);
+data = MaxMinFilter(data, 'AirPressurehPa', 600, 1000);
+data = MaxMinFilter(data, 'LongwaveRadiationDownWm2', 50, 400);
+data = MaxMinFilter(data, 'WindSpeed1ms', 0, 100);
+data = MaxMinFilter(data, 'WindSpeed2ms', 0, 100);
 
-data.AirPressurehPa(data.AirPressurehPa<600)=NaN;
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
 
-% issue with GCnetwind sensor during a time
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('magenta'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('magenta'))
+        end
+    end
+    
+%% issue with GCnetwind sensor during a time
     ind = and(data.WindSpeed2ms>9.5,...
     data.time<= datenum('19-Jun-1996'));
     data.WindSpeed2ms(ind)=NaN;
@@ -65,7 +232,23 @@ data.AirPressurehPa(data.AirPressurehPa<600)=NaN;
     data.time<= datenum('19-Jun-1996'));
     data.WindSpeed1ms(ind)=NaN;
 
-% filter in terms of albedo
+    % plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('light green'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('light green'))
+        end
+    end
+    
+%% filter in terms of albedo
 data.ShortwaveRadiationUpWm2( ...
     data.ShortwaveRadiationUpWm2 > ...
     0.95 * data.ShortwaveRadiationDownWm2) = NaN;
@@ -73,7 +256,23 @@ data.ShortwaveRadiationUpWm2( ...
     data.ShortwaveRadiationUpWm2 < ...
     0.35 * data.ShortwaveRadiationDownWm2) = NaN;
 
-% periods when WS<0.01ms for more than 6 hours are considered erroneous
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('orange'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('orange'))
+        end
+    end
+    
+%% periods when WS<0.01ms for more than 6 hours are considered erroneous
 ind = data.WindSpeed1ms < 0.01;
 no_wind_count = 0;
 for i = 1:length(ind)
@@ -108,6 +307,22 @@ end
 
 data.WindSpeed2ms(ind) = NaN;
 
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('turquoise'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('turquoise'))
+        end
+    end
+    
 %% measurements less than 0.5m from the ground are discarded
 data.WindSpeed1ms(data.WindSensorHeight1m < 0.5)=NaN;
 data.WindSpeed2ms(data.WindSensorHeight2m < 0.5)=NaN;
@@ -118,39 +333,56 @@ data.AirTemperature4C(data.WindSensorHeight2m < 0.5)=NaN;
 data.RelativeHumidity1Perc(data.WindSensorHeight1m < 0.5)=NaN;
 data.RelativeHumidity2Perc(data.WindSensorHeight2m < 0.5)=NaN;
 
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('pink'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('pink'))
+        end
+    end
+    
 %% measurements at unknown heights are discarded
-if ~ismember(station,{'SwissCamp','KAN_U'})
+if ~ismember(station,{'SwissCamp','KAN_U','NEEM','NOAA','Miller','KOB'})
     ind_issue = and(isnan(data.WindSensorHeight1m),~isnan(data.SnowHeight1m));
     
-out     = zeros(size(ind_issue'));
-aa      = [0,ind_issue',0];
-ii      = strfind(aa, [0 1]);
-out(ii) = strfind(aa, [1 0]) - ii;
+    out     = zeros(size(ind_issue'));
+    aa      = [0,ind_issue',0];
+    ii      = strfind(aa, [0 1]);
+    out(ii) = strfind(aa, [1 0]) - ii;
 
     if max(out) > 3*24*30
-        f= figure('Visible',vis);
-        subplot(2,1,1)
-        hold on
-        plot(data.time, data.WindSensorHeight1m,'LineWidth',2)
-        plot(data.time, data.SnowHeight1m,'LineWidth',2)
-        legend('Wind sensor height','Snow height')
-        ylabel('Height (m)')
-        set_monthly_tick(data.time)
-        set(gca,'XTickLabel','')
-        axis tight
-        subplot(2,1,2)
-        hold on
-        plot(data.time, data.WindSensorHeight2m,'LineWidth',2)
-        plot(data.time, data.SnowHeight2m,'LineWidth',2)
-        plot(data.time, ind_issue*5,'LineWidth',2)
-        legend('Wind sensor height','Snow height')
-        ylabel('Height (m)')
-        xlabel('Year')
-        set_monthly_tick(data.time)
-        set(gca,'XTickLabelRotation',0)
-        axis tight
-        print(f, sprintf('%s/Height_reconstruction1',OutputFolder), '-dpng')
+%         g= figure('Visible',vis);
+%         subplot(2,1,1)
+%         hold on
+%         plot(data.time, data.WindSensorHeight1m,'LineWidth',1.5)
+%         plot(data.time, data.SnowHeight1m,'LineWidth',1.5)
+%         legend('Wind sensor height','Snow height')
+%         ylabel('Height (m)')
+%         set_monthly_tick(data.time)
+%         set(gca,'XTickLabel','')
+%         axis tight
+%         subplot(2,1,2)
+%         hold on
+%         plot(data.time, data.WindSensorHeight2m,'LineWidth',1.5)
+%         plot(data.time, data.SnowHeight2m,'LineWidth',1.5)
+%         plot(data.time, ind_issue*5,'LineWidth',1.5)
+%         legend('Wind sensor height','Snow height')
+%         ylabel('Height (m)')
+%         xlabel('Year')
+%         set_monthly_tick(data.time)
+%         set(gca,'XTickLabelRotation',0)
+%         axis tight
+%         print(g, sprintf('%s/Height_reconstruction1',OutputFolder), '-dpng')
 
+disp('Warning: some period have snow height but no sensor height.')
         maintenance = ImportMaintenanceFile(station);
 
         switch station
@@ -179,12 +411,12 @@ out(ii) = strfind(aa, [1 0]) - ii;
     %     SurfaceHeight1(SurfaceHeight1<0) = NaN;
     %     SurfaceHeight2(SurfaceHeight2<0) = NaN;
 
-        f = figure('Visible',vis);
-        plot(data.time(ind),SurfaceHeight1)
-        hold on
-        plot(data.time(ind),SurfaceHeight2)
-        datetick('x')
-        print(f, sprintf('%s/Height_reconstruction2',OutputFolder), '-dpng')
+%         h = figure('Visible',vis);
+%         plot(data.time(ind),SurfaceHeight1)
+%         hold on
+%         plot(data.time(ind),SurfaceHeight2)
+%         datetick('x')
+%         print(h, sprintf('%s/Height_reconstruction2',OutputFolder), '-dpng')
 
         data.WindSensorHeight1m(ind) = SurfaceHeight1;
         data.WindSensorHeight2m(ind) = SurfaceHeight2;
@@ -200,6 +432,65 @@ end
     data.AirTemperature4C(isnan(data.WindSensorHeight2m ))=NaN;
     data.RelativeHumidity1Perc(isnan(data.WindSensorHeight1m ))=NaN;
     data.RelativeHumidity2Perc(isnan(data.WindSensorHeight2m ))=NaN;
+
+% plotting at this stage
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+            set(f,'CurrentAxes',ha(i)) 
+
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('jaune'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('jaune'))
+        end
+    end
+    
+%% Manual removal of suspicious data
+% site-specific correction of many erroneous periods
+% that is done by checking the data once plotted further down, see if a
+% sensor gives strange result then coming back here to correct or
+% remove the data
+switch station
+    case 'NASA-E'
+            DV = datevec(data.time);
+            ind= ismember(DV(:,2),2:5);
+            data.ShortwaveRadiationDownWm2(ind) = NaN;
+end
+       data = SetErrorDatatoNAN(data,station,vis);
+       
+	%plotting after removal
+    for i = 1:length(var_name)
+        if ~ismember(var_name{i},data.Properties.VariableNames)
+            continue
+        end
+        set(f,'CurrentAxes',ha(i)) 
+        if ~isempty(strfind(var_name{i},'Relat'))
+            T = nanmean([data.AirTemperature1C, data.AirTemperature3C],2);
+            temp = RHice2water(data.(var_name{i}),T+273.15,data.AirPressurehPa);
+            plot(data.time,temp,'LineWidth',1.5,'Color',RGB('dark green'))
+        else
+            plot(data.time,data.(var_name{i}),'LineWidth',1.5,'Color',RGB('dark green'))
+        end
+        datetick('x','yyyy-mm')
+        axis tight
+        set_monthly_tick(data.time)
+        xlim(data.time([1 end]))
+        if i <length(var_name)
+            set(gca,'XTickLabel','')
+        end
+    end
+        set(gca,'XTickLabelRotation',0)
+
+        set(f,'CurrentAxes',ha(3)) 
+        h_leg = legend('jaws qc','max/min','ws issue',...
+            'albedo', 'wind freeze', 'too close to ground',...
+            'no height','manual removal', 'final' ,'Location','NorthWest');
+        h_leg.Position(1) = h_leg.Position(1) +  0.69;
+    print(f,sprintf('%s/DataFiltering_%s',OutputFolder,station),'-dpng')
 
 %% smoothing
 % see hampel filter and GCnet documentation for further details
@@ -313,6 +604,7 @@ data.HumiditySensorHeight2m = hampel(data.HumiditySensorHeight2m,24*14,0.01);
 data.HumiditySensorHeight2m (ind_nan)=NaN;
 
 %% plot Sensor Height and compare to the reported heights
+if ~ismember(station, {'Miller','NOAA'})
     maintenance = ImportMaintenanceFile(station);
     date_change = maintenance.date;
 
@@ -321,8 +613,8 @@ data.HumiditySensorHeight2m (ind_nan)=NaN;
    set(ha(1),'Visible','off');
     set(f,'CurrentAxes',ha(2));
     hold on
-    plot(data.time, data.WindSensorHeight1m,'b','LineWidth',2)
-    plot(data.time, data.TemperatureSensorHeight1m,'Color',RGB('dark green'),'LineWidth',2)
+    plot(data.time, data.WindSensorHeight1m,'b','LineWidth',1.5)
+    plot(data.time, data.TemperatureSensorHeight1m,'LineWidth',1.5,'Color',RGB('dark green'),'LineWidth',1.5)
     scatter([datenum(maintenance.date); datenum(maintenance.date)], ...
         [maintenance.W1beforecm/100; maintenance.W1aftercm/100],...
         80,'b','o','filled', 'MarkerFaceColor', 'b')
@@ -367,7 +659,7 @@ data.HumiditySensorHeight2m (ind_nan)=NaN;
 
         set(f,'CurrentAxes',ha(3));
         hold on
-        plot(data.time, data.WindSensorHeight2m,'k','LineWidth',2)
+        plot(data.time, data.WindSensorHeight2m,'k','LineWidth',1.5)
         scatter(datenum(maintenance.date),maintenance.W2beforecm/100,80,'b','o','filled', 'MarkerFaceColor', 'b')
         scatter(datenum(maintenance.date),maintenance.W2aftercm/100,80,'b','d','filled', 'MarkerFaceColor', 'b')
         scatter(datenum(maintenance.date),maintenance.T2beforecm/100,80,[51,153,255]/255,'o','filled', 'MarkerFaceColor', [51,153,255]/255)
@@ -392,17 +684,11 @@ data.HumiditySensorHeight2m (ind_nan)=NaN;
      end
          
     orient(f,'landscape')
-print(f, sprintf('%s/height_wind_temp_sensors',OutputFolder),'-dpdf')
-
-% NOT USED ANYMORE: bigger holes are being filled with the other level
-% data = FillingGapsUsingOtherLevel(data, 'AirTemperature1C','AirTemperature2C');
-% data = FillingGapsUsingOtherLevel(data, 'AirTemperature2C','AirTemperature1C');
-% data = FilingGapsUsingOtherLevel(data, 'RelativeHumidity1Perc','RelativeHumidity2Perc');
-% data = FillingGapsUsingOtherLevel(data, 'RelativeHumidity2Perc','RelativeHumidity1Perc');
-% data = FillingGapsUsingOtherLevel(data, 'WindSpeed1ms','WindSpeed2ms');
-% data = FillingGapsUsingOtherLevel(data, 'WindSpeed2ms','WindSpeed1ms');
+    print(f, sprintf('%s/height_wind_temp_sensors',OutputFolder),'-dpdf')
+end
 
 %% before anything we interpolate to fill the small gaps
 data = InterpTable(data,6);
 
+data = ResampleTable(data);
 end

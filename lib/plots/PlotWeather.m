@@ -25,7 +25,8 @@ param.vis = 'on';
 param.OutputFolder ='.';
 param.VarList = {'ShortwaveRadiationDownWm2','ShortwaveRadiationUpWm2',...
     'AirTemperature2C','RelativeHumidity2Perc','AirPressurehPa',...
-    'WindSpeed2ms','LongwaveRadiationDownWm2','LongwaveRadiationUpWm2','Snowfallmweq'};
+    'WindSpeed2ms','LongwaveRadiationDownWm2','LongwaveRadiationUpWm2',...
+    'Snowfallmweq','Rainfallmweq'};
 param.LabelList = {'Downward SW \newline radiation (W/m^2)',...
     '  Upward SW \newline radiation (W/m^2)',...
     'Air temperature \newline          (^oC)',...
@@ -34,21 +35,27 @@ param.LabelList = {'Downward SW \newline radiation (W/m^2)',...
     'Wind speed \newline      (m/s)',...
     'Downward LW \newline radiation (W/m^2)',...
     'Upward LW \newline radiation (W/m^2)',...
-     'Snowfall rate \newline (m weq/hr)'};
+     'Snowfall rate \newline (mm weq/hr)',...
+     'Rainfall rate \newline (mm weq/hr)'};
 
-param.Origins = {'ShortwaveRadiationDownWm2_Origin','ShortwaveRadiationUpWm2_Origin',...
-    'AirTemperature2C_Origin','RelativeHumidity2Perc_Origin','AirPressurehPa_Origin',...
-    'WindSpeed2ms_Origin','LongwaveRadiationDownWm2_Origin','LongwaveRadiationUpWm2_Origin','Snowfallmweq_Origin'};
 
 for i = 1:2:length (varargin)
     param.(varargin{i}) = varargin{i+1};
 end
 
+if isempty(strfind([varargin{1:2:end}],'Origins'))
+     for i = 1:length(param.VarList)
+        param.Origins{i} = [param.VarList{i} '_Origin'];
+     end
+end
+
 i_remove = [];
 for i = 1:length(param.VarList)
     if ~ismember(param.VarList{i},data.Properties.VariableNames)
+        % not plotting variables in VarList that are not in data
         i_remove = [i_remove i];
     else
+        % not plotting variables that are filled with nan
         if sum(~isnan(data.(param.VarList{i})))<10
             i_remove = [i_remove i];
         end
@@ -58,6 +65,14 @@ param.VarList(i_remove) = [];
 param.Origins(i_remove) = [];
 param.LabelList(i_remove) = [];
 
+if ismember('Snowfallmweq',data.Properties.VariableNames)
+    data.Snowfallmweq=data.Snowfallmweq*1000;
+end
+
+if ismember('Rainfallmweq',data.Properties.VariableNames)
+    data.Rainfallmweq=data.Rainfallmweq*1000;
+end
+    
 %% Setting variable names and labels
 all_levels = [];
 for i = 1:length(param.Origins)
@@ -68,6 +83,7 @@ for i = 1:length(param.Origins)
         end
     else
             data.(param.Origins{i}) = zeros(size(data.time));
+            all_levels =[all_levels; unique(data.(param.Origins{i}))];
     end
 end
 all_levels = sort(unique(all_levels));
@@ -75,10 +91,11 @@ all_levels = all_levels(~isnan(all_levels));
   
 legend_text = {'Original data','adjusted from CP2',...
                     'adjusted from Swiss Camp','adjusted from KAN-U',...
-                    'adjusted from HIRHAM','calculated using MODIS albedo',...
+                    'adjusted from RCM','calculated using MODIS albedo',...
                     'taken from previous year',...
                     'Reconstructed by Charalampidis et al. 2015',...
-                    'Kobblefjord station'};
+                    'Kobblefjord station','adjusted from NOAA station',...
+                    'adjusted from Miller et al. 2017'};
 
 
 %% Plotting
@@ -146,6 +163,12 @@ for i = 1:length(param.VarList)
                 case 8
                 plot(data.time,data2{j}.(param.VarList{i}),...
                     'm')         %RGB('brown'))
+                case 9
+                plot(data.time,data2{j}.(param.VarList{i}),...
+                    'c')
+                case 10
+                plot(data.time,data2{j}.(param.VarList{i}),...
+                    'g')
 %             otherwise
 %                 plot(data.time,data2{j}.(param.VarList{i}))
             end
@@ -184,6 +207,10 @@ for i = 1:length(param.VarList)
                 ff = [ff, plot(1:2,1:2,'Color',[139,69,19]/255)];
                 case 8
                 ff = [ff, plot(1:2,1:2,'m')];
+                case 9
+                ff = [ff, plot(1:2,1:2,'c')];
+                case 10
+                ff = [ff, plot(1:2,1:2,'g')];
                 end
             end
             

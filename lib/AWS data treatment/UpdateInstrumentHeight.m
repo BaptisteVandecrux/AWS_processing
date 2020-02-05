@@ -3,8 +3,10 @@ if ~exist('VarName2')
     VarName2 = VarName1;
 end
 
-    ind_common1 = find(and(data.time<=data_aux.time(end)+0.0001,data.time>=data_aux.time(1)-0.0001));
-    ind_common2 = find(and(data_aux.time<=data.time(end)+0.0001,data_aux.time>=data.time(1)-0.0001));
+    ind_common1 = find(and(data.time<=data_aux.time(end)+0.0001,...
+        data.time>=data_aux.time(1)-0.0001));
+    ind_common2 = find(and(data_aux.time<=data.time(end)+0.0001,...
+        data_aux.time>=data.time(1)-0.0001));
 
     if length(ind_common1) == length(ind_common2)
         indnan1 = isnan(data.(VarName1)(ind_common1));
@@ -15,7 +17,7 @@ end
         ind_change2 = ind_common2(ind_change_common);
         
     else
-        error(sprintf('Missing time steps in %%s',Name))
+        error(sprintf('Missing time steps in %s',VarName1))
     end
     switch VarName1
         case 'RelativeHumidity1Perc'

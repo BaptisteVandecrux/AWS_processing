@@ -24,10 +24,7 @@ ErrorDataAllStations = readtable("C:\Users\bav\OneDrive - Geological survey of D
 ErrorDataAllStations = table2cell(ErrorDataAllStations);
 numIdx = cellfun(@(x) ~isnan(str2double(x)), ErrorDataAllStations);
 ErrorDataAllStations(numIdx) = cellfun(@(x) {str2double(x)}, ErrorDataAllStations(numIdx));
-while strcmp(ErrorDataAllStations{length(ErrorDataAllStations(:,1)),1},"")
-    ErrorDataAllStations(length(ErrorDataAllStations(:,1)),:) = [];
-end
-
+while
 variable_name = ErrorDataAllStations(:,1);
 date1 = ErrorDataAllStations(:,2);
 date2 = ErrorDataAllStations(:,3);

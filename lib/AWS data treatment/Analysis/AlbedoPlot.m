@@ -2,7 +2,7 @@ function AlbedoPlot(station_list,data_in, vis)
     % Albedo
     set(0,'DefaultAxesFontSize',15)
 
-    years_all = datenum(1998:2015,1,1);
+    years_all = datenum(1998:2018,1,1);
         if length(data_in) > 5
             f = figure('Visible',vis);
             ha = tight_subplot(round(length(data_in)/2),2,[0.03 0.03],[0.1 0.06],0.06);
@@ -30,7 +30,7 @@ function AlbedoPlot(station_list,data_in, vis)
         %     end
             data_JJA = data_JJA(:,[4 5]);
 
-            avg_alb_JJA = AvgTable(data_JJA,'yearly','nanmean');
+            avg_alb_JJA = AvgTable(data_JJA,'yearly2','nanmean');
             avg_alb_daily = AvgTable(data_JJA,'daily','nanmean');
             avg_alb_daily.Albedo(avg_alb_daily .Albedo==0) = NaN;
             first_ind = find(ismember(years_all,avg_alb_JJA.time),1,'first');
@@ -54,6 +54,12 @@ function AlbedoPlot(station_list,data_in, vis)
     %         p_JJA = fitlm(avg_alb_JJA);
             p_thres = 0.1;
             p = fitlm(avg_alb_JJA.time,avg_alb_JJA.Albedo);
+            fprintf('%s\t%0.03f\t%0.02f\t%0.02f\t%0.02f\n',station_list{ii},...
+                p.Coefficients.Estimate(2)*365*10,...
+                max(p.Coefficients.pValue),...
+                avg_alb_JJA.Albedo(avg_alb_JJA.time==datenum(2012,1,1)),...
+                nanmean(avg_alb_JJA.Albedo));
+            
             p_value = max(p.Coefficients.pValue);
 
             set(f,'CurrentAxes',ha(ii))
@@ -109,7 +115,7 @@ function AlbedoPlot(station_list,data_in, vis)
             h_title.FontSize = 12;
             ylim([0.7 0.9])
             xlim([years_all(1) years_all(end)])
-        %     xlim(datenum([1994 2015],1,1))
+        %     xlim(datenum([1994 2018],1,1))
         end
         while ii+1<=length(ha)
             set(ha(ii+1),'Visible','off')

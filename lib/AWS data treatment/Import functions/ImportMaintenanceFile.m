@@ -1,8 +1,14 @@
 function maintenance = ImportMaintenanceFile(station)
 
-[~, ~, raw] = xlsread('Input/maintenance.xlsx',station);
+ [~, SHEETS]   = xlsfinfo('Input/maintenance.xlsx');
+if sum(strcmp(SHEETS,station))==0
+    station = 'PROMICE';
+end
+
+[~, ~, raw] = xlsread('Input/maintenance.xlsx', station);
     raw = raw(2:end,:);
     raw(cellfun(@(x) ~isempty(x) && isnumeric(x) && isnan(x),raw)) = {''};
+    
     cellVectors = raw(:,2);
     dates = raw(:,1);
     raw = raw(:,3:end);

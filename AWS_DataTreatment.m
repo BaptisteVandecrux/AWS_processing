@@ -7,16 +7,19 @@ clear all
 close all
 clc
 
-%addpath('matlab_functions', 'Input', 'Output');
 addpath(genpath('lib'))
 addpath(genpath('Input'),genpath('Output'))
 
 % variable indicating whether you want the plots to be visible ('on') or
 % not ('off'). They are printed in files anyway.
 vis = 'off';
-% variable to plot comparisons of AWS data with HIRHAM data, which is used
+
+% Plot comparisons of AWS data with RCM data, which is used
 % to fill data gaps ('no' or 'yes')
 PlotGapFill = 'no';
+
+% Using tilt correction from jaws
+tilt_correct = 'yes';
 
 % setting default plotting parameters
 set(0,'defaultfigurepaperunits','centimeters');
@@ -24,35 +27,28 @@ set(0,'DefaultAxesFontSize',15)
 set(0,'defaultfigurecolor','w');
 set(0,'defaultfigureinverthardcopy','off');
 set(0,'defaultfigurepaperorientation','portrait');
-set(0,'defaultfigurepapersize',[29.7  16 ]);
-set(0,'defaultfigurepaperposition',[.25 .25 [29.7 16 ]-0.5]);
+set(0,'defaultfigurepapersize',[29.7  18 ]);
+set(0,'defaultfigurepaperposition',[.25 .25 [29.7 18 ]-0.5]);
 set(0,'DefaultTextInterpreter','none');
 set(0, 'DefaultFigureUnits', 'centimeters');
-set(0, 'DefaultFigurePosition', [.25 .25 [29.7 16 ]-0.5]);
+set(0, 'DefaultFigurePosition', [.25 .25 [29.7 18 ]-0.5]);
 warning('off','MATLAB:print:CustomResizeFcnInPrint')
 % some constants
 T_0 = 273.15;
 
-% ############ SELECT STATION HERE ####################
-station_list = {'NASA-U'};
-%     {'KAN_U', 'CP1', 'DYE-2', 'NASA-SE', 'Summit',...
-%      'NASA-E','NASA-U','SouthDome','TUNU-N','Saddle'};
-%      'NGRIP',...
-% station_list = {'KAN_U'};
+% select station here
+station_list = {'GITS'}; %{Stationname{15:24}};
 
-% do no contain good data coverage:
-% 'GITS' 'Humboldt'
+% it is also possible to loop through all or part of the PROMICE stations
+% here loading a station list:
+% Stationname = ["KPC_L";"KPC_U";"SCO_L";"SCO_U";"MIT";"TAS_L";"TAS_U";"TAS_A";"QAS_L";"QAS_U";"QAS_A";"NUK_L";"NUK_U";"NUK_K";"NUK_N";"KAN_B";"KAN_L";"KAN_M";"KAN_U";"UPE_L";"UPE_U";"THU_L";"THU_U";"SwissCamp";"CP1";"NASA-U";"GITS";"Humboldt";"Summit";"TUNU-N";"DYE-2";"JAR";"Saddle";"SouthDome";"NASA-E";"CP2";"NGRIP";"NASA-SE";"KAR";"JAR2";"KULU";"FA-1";"FA-2";"EKT"];
+% station_list = {Stationname{15:24}};
 
-% no HIRHAM data available
-% station_list = {'NEEM'};
-% No Snow temp data from GCNet
-% station_list = {'KULU'};
-% double data detected in date.time... check later
-% station_list = {'NGRIP','Saddle','SwissCamp'};
-
-%% #####################################################
-
-
+% Choice RCM
+RCM_list = {'RACMO','CanESM_rcp26','CanESM_rcp45','CanESM_rcp85'};
+for kk = 1:length(RCM_list)
+    RCM = RCM_list{kk};
+%% start looping through station list
 for i = 1: length(station_list)
     station = station_list{i};
 
@@ -63,14 +59,14 @@ for i = 1: length(station_list)
     % we make sure that it does not overwrite anything
     % it will continue to write in the file as long as the command diary('off')
     % is not run at the end of the script
-    OutputFolder = sprintf('Output/%s',station);
+    OutputFolder = sprintf('Output/%s_%s',station,RCM);
     mkdir(OutputFolder);
 
     i_file = 1;
     NameFile = sprintf('%s/log_%i.txt',OutputFolder,i_file)  ;
     while exist(NameFile, 'file') == 2
         i_file = i_file + 1;
-        NameFile = sprintf('./Output/log_%i.txt',i_file)  ;
+        NameFile = sprintf('%s/log_%i.txt',OutputFolder,i_file)  ;
     end
     diary(NameFile)
     clearvars NameFile i_file
@@ -86,16 +82,22 @@ for i = 1: length(station_list)
 disp('Loading data')
 tic
 
-name_GCnet = dir('./Input/GCnet');
-name_GCnet = {name_GCnet.name};
+% Loading GC-Net station list
+filename = '.\Input\GCnet\NamesStations.csv';
+delimiter = ''; formatSpec = '%s%[^\n\r]'; fileID = fopen(filename,'r');
+dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter,  'ReturnOnError', false);
+fclose(fileID); name_GCnet = dataArray{:, 1};
+clearvars filename delimiter formatSpec fileID dataArray ans;
 
 name_PROMICE = dir('./Input/PROMICE');
 name_PROMICE = {name_PROMICE.name};
 
+% Looking for station in GC-Net station list
 if sum(~cellfun(@isempty,strfind(name_GCnet,station)))>0
     is_GCnet = 1;
-    [data] = ImportGCnetData(station);
-   
+    [data] = ImportGCnetData(station,tilt_correct);
+    
+% Looking for station in PROMICE station list
 elseif sum(~cellfun(@isempty,strfind(name_PROMICE,station)))>0
     is_GCnet = 0;
     [data] = ImportPROMICEData(station);
@@ -109,7 +111,8 @@ end
 
 toc 
 disp('---------------------')
-% --------- Loading data from SECONDARY STATIONS for gap filling ----------
+
+%%  --------- Loading data from SECONDARY STATIONS for gap filling ----------
 disp('Loading secondary data')
 tic
  sec_stations_names = {};
@@ -130,7 +133,12 @@ switch station
         data_sec_stations{1} = LoadDataKANU(vis, OutputFolder);
         data_sec_stations{1}.LongwaveRadiationDownWm2 ...
             = NaN(size(data_sec_stations{1}.LongwaveRadiationDownWm2));
-    
+
+    case 'Summit'
+        sec_stations_names = {'NOAA', 'Miller'};
+        [data_sec_stations{1}, data_sec_stations{2}] = ...
+            LoadDataSummit(OutputFolder,vis);
+
     case 'KAN_U'
         sec_stations_names{1} = 'KANUbabis';
         data_sec_stations{1} = LoadDataKANUbabis() ;
@@ -142,66 +150,22 @@ end
 clearvars ind
 
 
-% ----------------- Loading HIRHAM data -----------------------------------  
-    [data_HIRHAM] = LoadHIRHAMData(station);
+% ----------------- Loading RCM data -----------------------------------  
+    [data_RCM] = LoadRCMData(station,RCM);
     
 toc 
 disp('---------------------')
    
-%% Manual removal of the erroneous data
-% site-specific correction of many erroneous periods
-% that is done by checking the data once plotted further down, see if a
-% sensor gives strange result then coming back here to correct or
-% remove the data
+%% Data filtering
+    disp('Filtering data')
 
-    disp('Removing erroneous data')
-    tic
-    switch station
-        case 'CP1'
-            [data] = SpecialTreatmentCP1(data);
-
-        case 'DYE-2'
-            DV  = datevec(data.time);  % [N x 6] array
-
-            ind2 = and(DV(:,4)>=21,DV(:,4)<=23);
-            ind = and(ind2,data.time>= datenum('01-Jan-2014'));
-            data.ShortwaveRadiationDownWm2(ind)=NaN;
-
-        case 'Summit'
-            data.AirTemperature3C(data.AirTemperature3C<-39.5)=NaN;
-            data.AirTemperature4C(data.AirTemperature4C<-39.5)=NaN;   
-
-        case 'NUK_K'
-            %measured snow thickness at installation
-            data.SnowHeight2m=data.SnowHeight2m+1.56;
-            [data] = SpecialTreatmentNUK_K(data);
-        case 'NASA-U'
-            [data] = SpecialTreatmentNASAU(data);
-        case 'Saddle'
-            data(find(abs(data.time-datenum('23-May-2013 13:59:57'))<1/24),:) = [];
-    end
-
-    data = SetErrorDatatoNAN(data,station,vis);
-    toc
-   
-%     disp('---------------------')
-%     disp('correcting Radiation'
-% tic
-%     data = CorrectingRadiation(data,station,vis);
-% toc
-
-    disp('---------------------')
-    % Standard Treatment and filtering
-    disp('Treating and filtering data')
-    tic
-    
     % Treat and filter the data - chose to convert humidity being measured
     % in ice to water - or not
 %     data = TreatAndFilterData(data,'ConvertHumidity', station, OutputFolder, vis);
+tic
        data = TreatAndFilterData(data,' ', station, OutputFolder, vis);
-    
-    toc
-    disp('---------------------')
+   toc     
+disp('---------------------')
 	
 %% Starting to keep track of the origin
 	% the following field will contain a code which indicates where the data
@@ -209,7 +173,7 @@ disp('---------------------')
 	% 0 -> original data
 	% 1 -> CP2 (used to fill gaps in CP1)
 	% 2 -> Crawford point (used to fill gaps in CP1)
-	% 3 -> HIRHAM data (used to fill gaps in all stations)
+	% 3 -> RCM data (used to fill gaps in all stations)
 	% 4 -> any radiation data calculated from MODIS albedo (used to fill gaps
 	% in all stations)
 	% 5 -> KANU (used for Dye 2)
@@ -238,69 +202,62 @@ disp('---------------------')
 	% periods where data has less gaps.
 	% If not needed, just use one period that includes all the data of the
 	% GCnet station.
-	
+
+    time_start = [];
+    time_end = [];
+
 	switch station
-% 	    case {'Summit'}
-% 	    time_start = datenum('01-Jun-2000 00:00:00');
-% 	    time_start = datenum('01-Jul-1990 00:00:00');
-% 	    case {'CP1', 'NASA-SE','DYE-2'}
-% 	%     time_start = datenum('01-Jul-2000 01:00:00');
-% 	    time_start = datenum('01-Jun-1998 00:00:00');
-	%     case {'DYE-2','NASA-SE'}
-	%     time_start = datenum('01-Jun-1998 00:00:00');
+        case 'GITS'
+            switch RCM
+                case 'CanESM_hist'
+                    time_start = datenum('01-Jun-1966 00:00:00');
+                    time_end = datenum('31-Dec-2012 00:00:00');
+                case {'CanESM_rcp26', 'CanESM_rcp45', 'CanESM_rcp85'}
+                    time_start = datenum('01-Jun-1966 00:00:00');
+                    time_end = datenum('31-Dec-2100 00:00:00');
+                otherwise
+                    time_start = datenum('01-Jun-1966 00:00:00');
+                    time_end = datenum('31-Dec-2017 23:00:00');
+            end
+
 	    case 'NUK_K'
-	    time_start = datenum('01-Sep-2014 00:00:00');	    
+	    time_start = datenum('01-Sep-2014 00:00:00');	
+	    time_end = datenum('01-Sep-2017 00:00:00');
+        
         case 'KAN_U'
 	    time_start = datenum('01-May-2012 00:00:00');
-	%     time_start = datenum('26-May-2017 18:00:00');
-	%     time_start = datenum('07-Apr-2017 18:00:00');
-%         case 'NASA-U'
-%             % start NASA-U in '03-Jun-2003 15:00:00' - due to missing data
-%             time_start = datenum('03-Jun-2003 15:00:00');
-	    otherwise
-% 	    time_start = max(data.time(1), data_HIRHAM.time(1));
-	    time_start = datenum('01-Jan-1998 00:00:00');
-	end
-% 	    time_start = max(data.time(1), data_HIRHAM.time(1));
-
-	switch station
-% 	    case 'CP1'
-% 	    time_end = datenum('01-Jun-2010');    
-% 	    case {'DYE-2','Summit','NASA-SE'}
-% 	    time_end = datenum('01-Jun-2015');
-        case 'NGRIP'
-            time_end = datenum('31-Dec-2009 23:00:00');
-	    case 'NUK_K'
-	    time_end = datenum('01-Sep-2017 00:00:00');
-	    case 'KAN_U'
 	    time_end = datenum('31-Dec-2016 00:00:00');
-%         case 'NASA-E'
-%             % stop NASA-E in '31-Dec-2014 23:00:00' - due to missing Wind data
-%             time_end = datenum('31-Dec-2014 23:00:00');
-
-	    otherwise
-% 	    time_end = min(data.time(end), data_HIRHAM.time(end));
-            time_end = datenum('31-Dec-2015 24:00:00');
-	end
-% 	time_end = max(data.time(end), data_HIRHAM.time(end));
-% 	data_old = data;
+        
+        case 'NGRIP'
+        time_end = datenum('31-Dec-2009 23:00:00');
+    end
+    
+    if isempty(time_start)
+        time_start = data.time(1);
+    end
+    if isempty(time_end)
+        time_end = data.time(end);
+    end
 	
-	% here the HIRHAM file is cropped to the desired period
-	ind_HIRHAM = find(and(data_HIRHAM.time>=time_start, data_HIRHAM.time<=time_end));
-	if ~isempty(ind_HIRHAM)
-	    if time_end>data_HIRHAM.time(end)
-	        added_rows  = array2table([[data_HIRHAM.time(end)+1/24:1/24:time_end]',...
-                NaN( length([data_HIRHAM.time(end)+1/24:1/24:time_end]),size(data_HIRHAM,2)-1)],...
-                'VariableNames',data_HIRHAM.Properties.VariableNames);
-	        data_HIRHAM = [data_HIRHAM;  added_rows];
+	% here the RCM file is cropped to the desired period 
+ 	ind_RCM = and(data_RCM.time>=time_start, data_RCM.time<=time_end);
+    data_RCM = data_RCM(ind_RCM,:);
+    
+	ind_RCM = find(and(data_RCM.time>=time_start, data_RCM.time<=time_end));
+	if ~isempty(ind_RCM)
+	    if time_end>data_RCM.time(end)
+	        added_rows  = array2table([[data_RCM.time(end)+1/24:1/24:time_end]',...
+                NaN( length([data_RCM.time(end)+1/24:1/24:time_end]),size(data_RCM,2)-1)],...
+                'VariableNames',data_RCM.Properties.VariableNames);
+	        data_RCM = [data_RCM;  added_rows];
 	    end
-	end
+    end
 
 	% here we crop the data
 	ind_AWS = find(and(data.time>=time_start, data.time<=time_end));
 	data = data(ind_AWS,:);
 	
-	% if we want to append data from HIRHAM before the start of the
+	% if we want to append data from RCM before the start of the
 	% station (time_start<data.time(1))
 	if time_start < data.time(1)
 	    num_missing_hour = floor((data.time(1)-time_start)*24);
@@ -310,51 +267,35 @@ disp('---------------------')
 	    end
 	    data = [table_aux; data];
     end
-	% if we want  to append data from HIRHAM after the end of the
+	% if we want  to append data from RCM after the end of the
 	% station (time_start<data.time(1))
 	if time_end > data.time(end)
 	    num_missing_hour = floor((time_end- data.time(end))*24);
 	    table_aux = array2table(NaN(num_missing_hour,size(data,2)),'VariableNames',data.Properties.VariableNames);
-	    for ii = 1:num_missing_hour
-	        table_aux.time(ii) = data.time(end) + ii/24;
-	    end
+	    table_aux.time = data.time(end) + [1:num_missing_hour]'/24;
 	    data = [data; table_aux];
 	end
 
-	% for i_period = 1:length(period)
-	% if working with more than one period, uncomment the above for loop (and respective 'end')
-	% otherwise stick to the statement below
-	i_period = 1;
-
-    % Creates period folder
-% OutputFolder = sprintf('Output/%s_p%i',station,i_period);
-
-% temp1 = datetime(datestr(data_old.time(period{i_period}.startind)));
-% temp2 = datetime(datestr(data_old.time(period{i_period}.endind)));
-% period_name = sprintf('%i-%i',temp1.Year,temp2.Year);
-% clear temp1 temp2
-
-% now data contains only the data for the period we want
-% data=data_old(period{i_period}.startind:period{i_period}.endind,:);
-    
 %%  =================== Filling gaps ======================================
 % In this section we fill the gaps at Crawford Point using the data from
 % CP2 station and from Swiss Camp
  disp('Filling gaps')
 tic
     PlotWeather(data,'OutputFolder',OutputFolder,'vis',vis);
-    
-    if ~isempty(ind_HIRHAM)
-        sec_stations_names = {sec_stations_names{:}, 'HIRHAM'};
-        data_sec_stations = {data_sec_stations{:}, data_HIRHAM};
+
+    if ~isempty(ind_RCM) && isempty(sec_stations_names)
+        sec_stations_names = {sec_stations_names{:}, RCM};
+        data_sec_stations = {data_sec_stations{:}, data_RCM};
     end
     
     VarList = {'AirTemperature1C', 'AirTemperature2C',...
     'ShortwaveRadiationDownWm2', 'NetRadiationWm2', ...
     'AirPressurehPa', 'RelativeHumidity1Perc',...
-    'RelativeHumidity2Perc', 'WindSpeed1ms', 'WindSpeed2ms','LongwaveRadiationDownWm2'};
+    'RelativeHumidity2Perc', 'WindSpeed1ms', 'WindSpeed2ms',...
+    'LongwaveRadiationDownWm2'};
 
-    summary_table = array2table(NaN(length(sec_stations_names)*3, 10));
+    clearvars summary_table
+    summary_table = array2table(NaN(length(sec_stations_names)*3, length(VarList)));
     summary_table.Properties.VariableNames = VarList;
 
     count = 1;
@@ -372,13 +313,12 @@ tic
             
             [data,  summary_table{(i-1)*3+3,:}, summary_table{(i-1)*3+2,:}, ~] ...
                 = CombiningData(station, sec_stations_names{i},...
-                data,data_sec_stations{i}, vis, PlotGapFill, SubFolder);
+                data,data_sec_stations{i},VarList, vis, PlotGapFill, SubFolder);
             
             data = InterpTable(data,6);
         end
     end
-    
-    
+      
     for i = 1:length(VarList)
         VarName = VarList{i};
         Origin = sprintf('%s_Origin',VarName);
@@ -390,15 +330,18 @@ tic
                     ind_sec_station =  2;
                 case 'KANU'
                     ind_sec_station =  3;
-                case 'HIRHAM'
+                case {'RCM','RACMO','MAR','HIRHAM','CanESM_hist','CanESM_rcp26','CanESM_rcp45','CanESM_rcp85'}
                     ind_sec_station =  4;  
                 case 'last_year'
                     ind_sec_station =  6; 
                 case 'KANUbabis'
                     ind_sec_station =  7;  
                 case 'KOB'
-                    ind_sec_station =  8;  
-
+                    ind_sec_station =  8;
+                case 'NOAA'
+                    ind_sec_station =  9;
+                case 'Miller'
+                    ind_sec_station =  10;
                 % 5 is left for modis
             end
             if ismember(Origin,data.Properties.VariableNames)
@@ -417,22 +360,8 @@ VarNames = data.Properties.VariableNames;
 if ~ismember('LongwaveRadiationUpWm2',data.Properties.VariableNames)
     data.LongwaveRadiationUpWm2 = NaN(size(data,1),1);
 end
-
 toc
 disp('---------------------')
-
-%% ============ Specific case at CP1 for surface height ==================
-% When generating the CP1 data, the surface height from CP2 is being used.
-% This is the only station where surface height is reconstructed from
-% another location. For all the other station the output from HIRHHAM5 will
-% be used instead
-if strcmp(station, 'CP1')
-    disp('Recover Surface Height From CP2')
-    tic
-    data = RecoverSurfaceHeightFromCP2(data,data_sec_stations{1},OutputFolder,vis);
-    toc
-    disp('---------------------')
-end
 
 %% ============ Reconstruction of surface height ==========================
 % The sonic rangers are used to measure surface height. It is important to
@@ -443,40 +372,28 @@ end
 % mast extended. This changes the surface height as seen by the sonic
 % ranger and needs to be corrected.
 disp('Surface height adjustement')
-
 tic
 [data] = AdjustHeight(data,station,OutputFolder,vis);
-
-    %  For KAN_U
-    if strcmp(station,'KAN_U')
-        f = figure('Visible',vis);
-        plot (data.time, data.SurfaceHeightm, 'b','LineWidth',2);
-        hold on
-        plot (data_sec_stations{1}.time, data_sec_stations{1}.ValidationHeightm, 'r', 'LineWidth',2)
-        axis tight
-        xlabel('Date')
-        legend('Baptiste','Babis')
-        datetick('x','dd-mm-yyyy', 'keeplimits', 'keepticks')
-        xlabel('Date')
-        print(f, sprintf('%s/Height_comp',OutputFolder), '-dpng')
-    end
-
- toc
+toc
 disp('---------------------')
  
 %% ================ Precipitation =============================
 disp('Calculating precipitation from station')
 tic
-data = CalculatePrecipitation(data,data_HIRHAM,station, OutputFolder,vis);
+data = CalculatePrecipitation(data,data_RCM,station, OutputFolder,vis);
 toc
  disp('---------------------')
-   
+
 %% =================== Subsurface temperatures ============================
 % The depth scale takes the surface as zero depth for each time step with
 % increasing positive depth downward.
 disp('Processing subsurface temperature measurement')
 tic
-data = SubsurfaceTemperatureProcessing(data,station,is_GCnet,OutputFolder,vis);
+ind_therm = find(contains(data.Properties.VariableNames,'IceTemp'));
+data_therm = table2array(data(:,ind_therm));
+if sum(sum(~isnan(data_therm)))>10
+    data = SubsurfaceTemperatureProcessing(data,station,is_GCnet,OutputFolder,vis);
+end
 toc
 disp('---------------------')
 
@@ -489,9 +406,10 @@ if strcmp(station,'NUK_K')
 else
     AlbedoStandardValue = 0.8;
 end
-vis = 'on'
+
 [data, data_modis] = fill_SWup_using_MODIS_albedo(data,...
-    station, is_GCnet, OutputFolder, AlbedoStandardValue, vis);
+    station, is_GCnet, OutputFolder, AlbedoStandardValue, data_RCM, vis);
+
 toc
 disp('--------------------')
 	    
@@ -513,13 +431,13 @@ ylabel('Instrument height')
 print(f,sprintf('%s/instr_height',OutputFolder),'-dtiff')
 
 % plot all climate variables
-PlotWeather(data,'OutputFolder',OutputFolder,'vis',vis);
+PlotWeather(data,'OutputFolder',OutputFolder,'vis','on');
 
 % print the origin distribution for each variable    
 VarList = {'ShortwaveRadiationDownWm2','ShortwaveRadiationUpWm2',...
     'AirTemperature2C','RelativeHumidity2Perc','AirPressurehPa',...
     'WindSpeed2ms','LongwaveRadiationDownWm2','Snowfallmweq'};
-SourceList = {'Original', 'CP2', 'SC', 'KAN_U','HIRHAM','MODIS','last year','KANU_babis','KOB'};
+SourceList = {'Original', 'CP2', 'SC', 'KAN_U','RCM','MODIS','last year','KANU_babis','KOB'};
 
 source = array2table(zeros(length(SourceList),length(VarList)));
 source.Properties.VariableNames = VarList;
@@ -601,6 +519,7 @@ disp('--------------------')
     
 	data_final.SurfaceHeightm =     data.SurfaceHeightm;    
 	data_final.Snowfallmweq =     data.Snowfallmweq;
+	data_final.Rainfallmweq =     data.Rainfallmweq;
     
 	for i = 1:10
 	    VarName = sprintf('DepthThermistor%im',i);
@@ -636,4 +555,4 @@ disp('--------------------')
 	disp('')
     
 end
-
+end

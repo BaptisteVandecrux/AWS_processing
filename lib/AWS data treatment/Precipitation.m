@@ -80,6 +80,7 @@ switch c.precip_scheme
         date_pit = datenum(pit_data.Date);
         ind = and(date_pit>time_mod(1),date_pit<time_mod(end));
         pit_data = pit_data(ind,:);
+    pit_data.SWE_uncor = NaN(size(pit_data,1),1);
 
 if size(pit_data,1)>0  
             
@@ -108,19 +109,32 @@ if size(pit_data,1)>0
             pit_data.ind_start(i):pit_data.ind_end(i)))*1000 ...
             + pit_data.tot_subl(i);
 
+%         datestr(date_start)
+%         datestr(date_end)
+%         figure
+%         hold on
+%         plot(time_mod,Surface_Height)
+%          plot(time_mod([pit_data.ind_start(i) pit_data.ind_start(i)]), [0 3])
+%          plot(time_mod([pit_data.ind_end(i) pit_data.ind_end(i)]), [0 3])
+%         datetick('x')
+%         pause
         % cancelling cases where the beginning of accumulation period is
         % not available
         if abs(date_start - datenum(temp(:,1)-1,09,01))>30
             pit_data.SWE_uncor(i) = NaN;
-        elseif sum(isnan(Surface_Height(...
+            continue
+        end
+        if sum(isnan(Surface_Height(...
             pit_data.ind_start(i):pit_data.ind_end(i)))) > length(...
-            pit_data.ind_start(i):pit_data.ind_end(i))*0.8
+            pit_data.ind_start(i):pit_data.ind_end(i))*0.1
             % cancelling cases where too many surface height meeasurements
             % are missing
             pit_data.SWE_uncor(i) = NaN;
         end
     end
-    
+end
+
+if and(size(pit_data,1)>0      , sum(~isnan(pit_data.SWE_uncor))>=1)
     ind_good_years = ~isnan(pit_data.SWE_uncor);
     bias_uncor = mean(pit_data.SWE_uncor(ind_good_years) - pit_data.SWE_pit(ind_good_years));
     RMSE_uncor = sqrt(mean((pit_data.SWE_uncor(ind_good_years) - pit_data.SWE_pit(ind_good_years)).^2));
@@ -145,7 +159,7 @@ if size(pit_data,1)>0
             pit_data.SWE_cor(i) = NaN;
         elseif sum(isnan(Surface_Height(...
             pit_data.ind_start(i):pit_data.ind_end(i)))) > length(...
-            pit_data.ind_start(i):pit_data.ind_end(i))*0.8
+            pit_data.ind_start(i):pit_data.ind_end(i))*0.1
             % cancelling cases where too many surface height meeasurements
             % are missing
             pit_data.SWE_cor(i) = NaN;

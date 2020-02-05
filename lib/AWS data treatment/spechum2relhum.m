@@ -3,7 +3,7 @@ function [RH_wrt_i, RH_wrt_w] = spechum2relhum(T, pres, q, c)
 % spechum2relhum
 %
 % Author: Dirk Van As (dva@geus.dk) & Robert S. Fausto (rsf@geus.dk)
-% translated to matlab by Baptiste Vandecrux (bava@byg.dtu.dk)
+% translated to matlab by Baptiste Vandecrux (b.vandecrux@gmail.com)
 %==========================================================================
 
     % SPECIFIC HUMIDITY & SATURATION -----------------------------------------------------------------------

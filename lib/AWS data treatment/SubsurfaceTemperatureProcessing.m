@@ -208,7 +208,7 @@ maintenance = ImportMaintenanceFile(station);
     box on
     h.Color = 'r';
     h.LineWidth=2;
-    legend(leg,'Surface')
+    legend({leg{:},'Surface'})
     ylabel('Depth (m)')
     box on
     datetick('x','yyyy', 'keeplimits', 'keepticks')

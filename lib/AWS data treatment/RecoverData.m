@@ -13,7 +13,7 @@ switch Name
         ind_sec_station =  2;
     case 'KANU'
         ind_sec_station =  3;
-    case 'HIRHAM'
+    case {'HIRHAM','MAR','RACMO','CanESM_hist','CanESM_rcp26','CanESM_rcp45','CanESM_rcp85'}
         ind_sec_station =  4;  
     case 'last_year'
     ind_sec_station =  6; 
@@ -21,11 +21,16 @@ switch Name
     ind_sec_station =  7;  
     case 'KOB'
     ind_sec_station =  8;  
+    case 'NOAA'
+    ind_sec_station =  9;  
+    case 'Miller'
+    ind_sec_station =  10;  
 
     % 5 is left for modis
 end
 
-    ind_common = and(data.time<=data2.time(end)+0.0001,data.time>=data2.time(1)-0.0001);
+    ind_common = and(data.time<=data2.time(end)+0.0001,...
+        data.time>=data2.time(1)-0.0001);
     data1 = data(ind_common,:);
     
     ind_common = and(data2.time<=data.time(end)+0.0001,data2.time>=data.time(1)-0.0001);
@@ -65,22 +70,28 @@ else
     x = data1.(VarName1);
     y = data3.(VarName2);
 
-    % double check regarding thhe synchronization of the two time series
-    x_scaled = (x - nanmean(x)) / nanstd(x);
-    x_scaled(isnan(x)) = 0;
-    y_scaled = (y - nanmean(y)) / nanstd(y);
-    y_scaled(isnan(y)) = 0;
-    [acor, lag] = xcorr(x_scaled,y_scaled);
-    if find(lag(acor==max(acor))) ~= 0
-        shift = lag(acor==max(acor));
-        if shift >0
-            data3.(VarName2)(shift+1:end) = data3.(VarName2)(1:end-shift);
-        else
-            data3.(VarName2)(1:end+shift) = data3.(VarName2)(-shift+1:end);
+    if ~contains(Name,'CanESM')
+        % double check regarding thhe synchronization of the two time series
+        x_scaled = (x - nanmean(x)) / nanstd(x);
+        x_scaled(isnan(x)) = 0;
+        y_scaled = (y - nanmean(y)) / nanstd(y);
+        y_scaled(isnan(y)) = 0;
+        [acor, lag] = xcorr(x_scaled,y_scaled,18);
+        if find(lag(acor==max(acor))) ~= 0
+            disp('========== lag detected ===========')
+            shift = lag(acor==max(acor));
+            disp(shift)
+
+            if shift >0
+                data3.(VarName2)(shift+1:end) = data3.(VarName2)(1:end-shift);
+            else
+                data3.(VarName2)(1:end+shift) = data3.(VarName2)(-shift+1:end);
+            end
         end
+
+        x = data1.(VarName1);
+        y = data3.(VarName2);
     end
-    x = data1.(VarName1);
-    y = data3.(VarName2);
 
     %% setting up neural network
 
@@ -173,7 +184,7 @@ end
     %% SLM
     % divi = [0 0.3 0.6 0.7 0.8 0.9 0.95 1];
     % knots = min(y) +  divi* (max(y)-min(y));
-    if ~isempty(strfind(VarName1,'Humidity'))
+    if contains(VarName1,'Humidity')
 
         slm = slmengine(y,x,'plot','off',...
             'increasing','on',...
@@ -181,28 +192,36 @@ end
             'maxslope',10,...
             'rightvalue',100); %,'knots',knots);
         
-    elseif ~isempty(strfind(VarName1,'Snowfall'))
+    elseif contains(VarName1,'Snowfall')
 
         slm = slmengine(y,x,'plot','on',...
             'increasing','on',...
             'leftvalue',0); %,'knots',knots);
 
 
-    elseif  ~isempty(strfind(VarName1,'WindSpeed')) || ~isempty(strfind(VarName1,'Shortwave'))
+    elseif  contains(VarName1,'WindSpeed')
         slm = slmengine(y,x,'plot','off',...
         'increasing','on',...
-        'minslope',0.5,...
-        'maxslope',10,...
-        'leftvalue',0); %,'knots',knots);
+        'minslope',0.9,...
+        'leftvalue',0,...
+        'rightvalue',max([y; x])); %,'knots',knots);      
+    elseif contains(VarName1,'Shortwave')
+        slm = slmengine(y,x,'plot','off',...
+        'increasing','on',...
+        'leftvalue',0,...
+        'rightvalue',max([y; x])); %,'knots',knots);
     else
         slm = slmengine(y,x,'plot','off',...
         'increasing','on',...
-        'minslope',0.5,...
+            'knots',10,...
+            'interiorknots','free',...
+            'minslope',0.5,...
         'maxslope',10); %,'knots',knots);
     end
     hold on
     x_pred = linspace(min(y), max(y));
     y_pred = slmeval(x_pred,slm);
+    
     targets = x';
     outputs=NaN(size(y));
     outputs(~isnan(y)) = slmeval(y(~isnan(y)),slm)';
@@ -216,22 +235,6 @@ end
     ME_PW_cor = nanmean(targets-outputs');
 
         %% Plotting and comparing
-    % f=figure('Visible',vis);
-    % hold on
-    % plot(smooth(x,24),'LineWidth',1.5)
-    % 
-    % plot(smooth(y,24))
-    % plot(smooth(outputs,24),'LineWidth',1.5)
-    % plot(smooth(data_scaled,24))
-    % box on
-    % axis tight
-    % xlabel('Time')
-    % ylabel(VarName2)
-    % legend('Main data','Secondary data','... when scaled by NN','... when scaled by linear function')
-    % print(f,sprintf('%s/%s_1',OutputFolder,VarName1),'-dtiff')
-    %     if strcmp(vis,'off')
-    %         close(f);
-    %     end
     ind = ~isnan(targets);
        set(0,'DefaultAxesFontSize',18)
 if strcmp ( PlotGapFill,'yes')
@@ -251,6 +254,10 @@ if strcmp ( PlotGapFill,'yes')
             sqrt(nanmean((targets'-y).^2)),...
             nanmean(targets'-y)),'interpreter','tex');
         axis tight square
+        for i = 1:length(slm.knots)
+            plot([1 1].*slm.knots(i),get(gca,'YLim'),'Color',RGB('gray'))
+        end
+
         plot([min(targets) max(targets)], [min(targets) max(targets)], ':k','LineWidth',2)
         box on
         legendflex({'data','linear fit','piecewise spline fit','1:1 line'},...
@@ -264,24 +271,6 @@ if strcmp ( PlotGapFill,'yes')
                        'interpreter','tex');
         ylabel('Main station')
         xlabel(sprintf('Raw data from %s',Name))
-
-    %     set(gca,'Units','normalized')
-    %     axes('Position',get(ha(1),'Position').*[1.1 7.5 0.35 0.25])
-    % hold on
-    %     scatter(y,targets,'.b')
-    %     [lm, ~] = Plotlm(y,targets,'Annotation','off','Color','r');
-    %     plot(x_pred,y_pred,'--c','LineWidth',2)
-    % 
-    %     axis tight square
-    %     plot([min(targets) max(targets)], [min(targets) max(targets)], ':k','LineWidth',2)
-    %     box on
-    %     ylimit =get(gca,'XLim');
-    %     aux = (ylimit(2)-ylimit(1))/10;
-    %     ylim([max(targets)*0.1 max(targets)])
-    %     xlim([ylimit(2)-aux max(y)])
-    %     set(gca,'XTickLabel','','YTickLabel','')
-    %     
-
 
     set(f,'CurrentAxes',ha(2))
     hold on
@@ -317,27 +306,12 @@ if strcmp ( PlotGapFill,'yes')
     % ylabel('Main station')
     xlabel(sprintf('Data from %s\n corrected using \npiecewise spline fit',Name))
 
-    % annotation(f,'textbox',...
-    %     [0.35 0.8 0.4 0.1],...
-    %     'String',{sprintf('Reconstruction of %s',VarName1)},...
-    %     'FitBoxToText','on',...
-    %     'FontSize',15,...
-    %     'LineStyle','none');
     set(gca,'YTickLabel','')
-
-    % Create textbox
-    % annotation(f,'textbox',...
-    %     [0.74 0.2 0.15 0.05],...
-    %     'String',{sprintf('Performance of the NN: %0.2f',performance)},...
-    %     'FitBoxToText','on',...
-    %     'LineStyle','none');
     print(f,sprintf('%s/%s_2',OutputFolder,VarName1),'-dtiff')
         if strcmp(vis,'off')
             close(f);
         end
 end
-
-
 
     %%  Filling the gaps 
         ind_common = find(and(data.time<=data2.time(end)+0.0001,data.time>=data2.time(1)-0.0001));

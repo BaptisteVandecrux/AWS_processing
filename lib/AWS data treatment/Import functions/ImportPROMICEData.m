@@ -1,6 +1,6 @@
 function [data] = ImportPROMICEData(station)
     % Hourly values from the station
-        filename = sprintf('C:/Users/bava/OwnCloud_new/Data/AWS/Input/PROMICE/%s_hour_v03.txt',station);
+        filename = sprintf('./Input/PROMICE/%s_hour_v03.txt',station);
 
         delimiter = ' ';
         startRow = 2;

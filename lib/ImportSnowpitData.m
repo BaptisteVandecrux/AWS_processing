@@ -1,6 +1,10 @@
 function [tableout, subl] = ImportSnowpitData(c)
-[~, ~, raw, dates] = xlsread('.\Input\Greenland_snow_pit_SWE_jeb.xlsx','snow_pit_SWE_compiled_by_J_Box_','A2:P267','',@convertSpreadsheetExcelDates);
+
+[~, ~, raw, dates] = xlsread('.\Input\Greenland_snow_pit_SWE_jeb.xlsx','snow_pit_SWE_compiled_by_J_Box_','A2:P10000','',@convertSpreadsheetExcelDates);
 raw(cellfun(@(x) ~isempty(x) && isnumeric(x) && isnan(x),raw)) = {''};
+raw(cellfun(@(x) isempty(x),raw(:,1)),:) = [];
+dates(cellfun(@(x) isempty(x),dates(:,1)),:) = [];
+
 cellVectors = raw(:,[1,12,13,14,16]);
 raw = raw(:,[2,3,4,5,6,7,8,9,10,11]);
 dates = dates(:,15);
@@ -19,6 +23,11 @@ clearvars data raw dates cellVectors R;
 
 % Loading the sublimation estimates
 filename = ['./Input/Sublimation estimates/' c.station '_sublimation.txt'];
+
+if exist(filename)==0
+    disp('WARNING: Using sublimation estimate from NASA-E')
+    filename = ['./Input/Sublimation estimates/NASA-E_sublimation.txt'];
+end
 delimiter = ';';
 formatSpec = '%f%f%[^\n\r]';
 fileID = fopen(filename,'r');

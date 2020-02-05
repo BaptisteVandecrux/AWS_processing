@@ -1,5 +1,5 @@
 function [data_KOB] = LoadDataKOB(OutputFolder,vis)
-    filename = '.\Input\KOB_station.txt';
+    filename = '.\Input\Secondary data\KOB_station.txt';
     delimiter = '\t';
     startRow = 2;
 

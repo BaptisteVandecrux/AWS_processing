@@ -1,6 +1,6 @@
 function data_SC = LoadDataSC(vis,OutputFolder)
  %Loading variable list
-    filename = './Input/GCnet/SwissCamp2.txt';
+    filename = './Input/GCnet/Additional files/SwissCamp2.txt';
     startRow = 2;
     endRow = 35;
     formatSpec = '%2f%48s%[^\n\r]';

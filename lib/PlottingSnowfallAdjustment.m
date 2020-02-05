@@ -7,7 +7,7 @@ function [] = PlottingSnowfallAdjustment(Surface_Height, pit_data, ...
     col = linspecer(size(pit_data,1),'qualitative');
     f = figure('Visible',c.vis);%,'Position',[-2000 100 1800 700]);
     ha = tight_subplot(1,3,0.02,0.05,0.07);
-
+leg_text={};
     set(f,'CurrentAxes',ha(1))
         hold on
         h = [];
@@ -22,7 +22,9 @@ function [] = PlottingSnowfallAdjustment(Surface_Height, pit_data, ...
         plot([0 ymax(2)],[0 ymax(2)],'k')
         box on
         set(gca,'XMinorTick','on','YMinorTick','on');
-        legendflex(h,leg_text,'anchor',{'n','n'},'box','off','buffer',[650 0],'nrow',3)
+        if ~isempty(leg_text)
+            legendflex(h,leg_text,'anchor',{'n','n'},'box','off','buffer',[650 0],'nrow',3)
+        end
         hx = xlabel('SWE from station (mm weq)');
         hx.Position = hx.Position + [320 0 0];
 

@@ -30,7 +30,7 @@ switch period
            i = i + 1;
         end
     case 'yearly2'
-        while time_new(end) + 360 < datenum(time_end)
+        while time_new(end) + 360 < datenum(time_end)+6*31
            time_new(i) = datenum(time_start(:,1) + i-1, 1, 1);
            i = i + 1;
         end

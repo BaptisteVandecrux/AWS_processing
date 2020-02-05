@@ -1,6 +1,6 @@
 function [data_2] = LoadExtraFileCP1()
 T_0 =273.15;
-    filename = 'Input\GCnet\CP1_extra_1.csv';
+    filename = 'Input\GCnet\Additional files\CP1_extra_1.csv';
     delimiter = ';';
     startRow = 2;
     formatSpec = '%s%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%f%[^\n\r]';

@@ -1,4 +1,4 @@
-function [data] = ImportGCnetData(station,tilt_correct)
+function [data] = ImportGCnetData(station)
 
 %% Loading GCnet metadata
 
@@ -77,116 +77,145 @@ switch station
         station_num = find(strcmp(station,overview.StationName));
 end
 
-filename = dir(sprintf('./Input/GCnet/20190501_jaws/%02i*',station_num));
+filename = dir(sprintf('./Input/GCnet/20190501/%02i*',station_num));
+% filename = sprintf('./Input/GCnet/10102018/%s.txt',station);
 if size(filename,1) == 0
-    filename = dir(sprintf('./Input/GCnet/10102018_jaws/%02i*',station_num));
-%     if size(filename,1) == 0
-%         error('No data file found.')
-%     elseif size(filename,1) >1
-%         error('Several data files found.')
-%     end
+    error('No data file found.')
 elseif size(filename,1) >1
     error('Several data files found.')
-else
 end
- 
-%% Loading jaws file
+filename =filename.name;
 
-if size(filename,1)~=0
-    disp('Reading:')
-    disp(filename)
-    filename=filename.name;
-    file_info = ncinfo(filename);
-    list_var = {'Year',                 'year',;...
-        'JulianTime',                   'julian_decimal_time';...
-        'ShortwaveRadiationDownWm2',    'fsds';...
-        'ShortwaveRadiationUpWm2',      'fsus';...
-        'NetRadiationWm2',              'fsns';...
-        'AirTemperature1C',             'ta_tc1';...
-        'AirTemperature2C',             'ta_tc2';...
-        'AirTemperature3C',             'ta_cs1';...
-        'AirTemperature4C',             'ta_cs2';...
-        'RelativeHumidity1Perc',        'rh1';...
-        'RelativeHumidity2Perc',        'rh2';...
-        'WindSpeed1ms',                 'wspd1';...
-        'WindSpeed2ms',                 'wspd2';...
-        'WindDirection1deg',            'wdir1';...
-        'WindDirection2deg',            'wdir2';...
-        'AirPressurehPa',               'ps';...
-        'SnowHeight1m',                 'snh1';...
-        'SnowHeight2m',                 'snh2';...
-        'IceTemperature1C',             'tsn1';...
-        'IceTemperature2C',             'tsn2';...
-        'IceTemperature3C',             'tsn3';...
-        'IceTemperature4C',             'tsn4';...
-        'IceTemperature5C',             'tsn5';...
-        'IceTemperature6C',             'tsn6';...
-        'IceTemperature7C',             'tsn7';...
-        'IceTemperature8C',             'tsn8';...
-        'IceTemperature9C',             'tsn9';...
-        'IceTemperature10C',            'tsn10';...
-        'Windspeed2mms',                'wpd_2m';...
-        'Windspeed10mms',               'wspd_10m';...
-        'WindSensorHeight1m',           'wind_sensor_height_1'; ...
-        'WindSensorHeight2m',           'wind_sensor_height_2';...
-        'Albedo',                       'alb';...
-        'ZenithAngledeg',               'zenith_angle';...
-        'SZA_jaws',                     'sza'};
-    clearvars data
+%% detecting length of header
+% tic
+formatSpec = '%s%[^\n\r]';
+fileID = fopen(filename,'r');
+    temp = 0;
 
-    data = table;
-    vars = {file_info.Variables.Name};
-    for i = 1:length(vars)
-        aux= strcmp(list_var(:,2),vars{i});
-        Index = find(aux);
-        if ~isempty(Index)
-            data.(list_var{Index,1}) = double(ncread(filename,list_var{Index,2}));
-%             disp([list_var{Index,1} '  ' list_var{Index,2} '  ' vars{i}])
-%             pause
+for Row = 1:60
+    dataArray = textscan(fileID, formatSpec, 1, 'Delimiter', '', 'WhiteSpace', '', 'ReturnOnError', false);
+    test = dataArray{1, 1}{1};
+
+    if ~ismember(test(1), '0123456789')
+        continue
+    else
+%             disp(test)
+
+        if str2num(strtrim(test(1:2))) == temp +1
+            temp = temp+1;
+            continue
         else
-            try data.(vars{i}) = double(ncread(filename,vars{i}));
-            catch me
-%                 warning('Could not extract %s',vars{i});
-            end
+%             disp(temp)
+            break
         end
     end
+end
+fclose(fileID);
+clearvars endRow formatSpec fileID dataArray ans;
+endRow_header = temp +1;
+num_var  = temp;
+% toc
+%%
+startRow = 1;
 
-    for i = 1:length(list_var(:,2))
-        aux= strcmp(vars(:), list_var(i,2));
-        Index = find(aux);
-        if ~isempty(Index)
-        else
-            data.(list_var{i,2})(1) = NaN;
-            data.(list_var{i,2})(:) = NaN;
-            fprintf('%s is missing from file\n',list_var{i,2});
-        end
-    end
+formatSpec = '%s%[^\n\r]';
+fileID = fopen(filename,'r');
+textscan(fileID, '%[^\n\r]', startRow-1, 'WhiteSpace', '', 'ReturnOnError', false);
+dataArray = textscan(fileID, formatSpec, endRow_header-startRow+1, 'Delimiter', '', 'WhiteSpace', '', 'ReturnOnError', false);
+dataArray{2} = strtrim(dataArray{2});
+fclose(fileID);
+FieldNumber = dataArray{:, 1};
+FieldNames = dataArray{:, 2};
+clearvars startRow formatSpec fileID dataArray ans;
 
-    % Matlab tie stamp
-    data.time = datenum(data.Year,0,data.JulianTime+1);
-    
-    % using tilt corrected values if asked
-    if strcmp(tilt_correct,'yes')
-        ind_replace = data.fsds_adjusted~=0;
-        data.ShortwaveRadiationDownWm2(ind_replace) = data.fsds_adjusted(ind_replace);
-        ind_replace = data.fsus_adjusted~=0;
-        data.ShortwaveRadiationUpWm2(ind_replace) = data.fsus_adjusted(ind_replace);
-    end
-    % removing duplicates
-    ind_remove = find(data.time(2:end)-data.time(1:end-1)<=0);
-    % disp('Duplicate timesteps:')
-    % disp(ind_remove)
-    data(ind_remove,:)=[];
+for i = 1:length(FieldNames)
+    FieldNames{i} = strrep(FieldNames{i},' ','_');
+end
 
-    time_2 = datevec(data.time);
-    data.MonthOfTheYear = time_2(:,2);
-    data.DayOfTheMonth = time_2(:,3);
-    data.HourOfTheDay = time_2(:,4);
-    data.DayOfTheYear = floor(data.JulianTime+1);
-    data.JulianTime = floor(data.JulianTime)+ data.HourOfTheDay/24;
-    clearvars time_2
-    
-    % Extra files from CP1
+% now extracting the data
+delimiter = ' ';
+startRow = endRow_header+1;
+formatSpec = strcat(repmat('%f',1,endRow_header-1), '%[^\n\r]');
+fileID = fopen(filename,'r');
+
+textscan(fileID, '%[^\n\r]', startRow-1, 'WhiteSpace', '', 'ReturnOnError', false);
+dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'MultipleDelimsAsOne', true, 'EmptyValue' ,NaN,'ReturnOnError', false);
+fclose(fileID);
+
+switch num_var
+    case 35
+    list_var = {'StationName', 'Year', 'JulianTime', 'ShortwaveRadiationDownWm2',...
+    'ShortwaveRadiationUpWm2','NetRadiationWm2', 'AirTemperature1C',...
+    'AirTemperature2C', 'AirTemperature3C', 'AirTemperature4C',...
+    'RelativeHumidity1Perc','RelativeHumidity2Perc',...
+    'WindSpeed1ms','WindSpeed2ms','WindDirection1deg','WindDirection2deg',...
+    'AirPressurehPa','SnowHeight1m','SnowHeight2m','IceTemperature1C',...
+    'IceTemperature2C','IceTemperature3C','IceTemperature4C','IceTemperature5C',...
+    'IceTemperature6C','IceTemperature7C','IceTemperature8C','IceTemperature9C',...
+    'IceTemperature10C', 'WindSpeed2mms', 'WindSpeed10mms','WindSensorHeight1m',...
+    'WindSensorHeight2m', 'ZenithAngledeg'};
+    case 51
+    list_var = {'StationName', 'Year', 'JulianTime', 'ShortwaveRadiationDownWm2',...
+    'ShortwaveRadiationUpWm2','NetRadiationWm2', 'AirTemperature1C',...
+    'AirTemperature2C', 'AirTemperature3C', 'AirTemperature4C',...
+    'RelativeHumidity1Perc','RelativeHumidity2Perc',...
+    'WindSpeed1ms','WindSpeed2ms','WindDirection1deg','WindDirection2deg',...
+    'AirPressurehPa','SnowHeight1m','SnowHeight2m','IceTemperature1C',...
+    'IceTemperature2C','IceTemperature3C','IceTemperature4C','IceTemperature5C',...
+    'IceTemperature6C','IceTemperature7C','IceTemperature8C','IceTemperature9C',...
+    'IceTemperature10C','BatteryVoltageV','aux1Wm2','aux2Wm2','NetRadMaxWm',...
+    'MaxAirTemperture1degC','MaxAirTemperture2degC','MinAirTemperture1degC',...
+    'MinAirTemperture2degC', 'MaxWindspeed1ms', 'MaxWindspeed2ms', ...
+    'StdDevWindspeed1ms', 'StdDevWindspeed2ms', 'RefTemperaturedegC',...
+    'Windspeed2mms', 'Windspeed10mms', 'WindSensorHeight1m', ...
+    'WindSensorHeight2m', 'Albedo', 'ZenithAngledeg', 'QCl01_08',...
+    'QCl09_16', 'QCl25_27'};
+    case 52
+    list_var = {'StationName', 'Year', 'JulianTime', 'ShortwaveRadiationDownWm2',...
+    'ShortwaveRadiationUpWm2','NetRadiationWm2', 'AirTemperature1C',...
+    'AirTemperature2C', 'AirTemperature3C', 'AirTemperature4C',...
+    'RelativeHumidity1Perc','RelativeHumidity2Perc',...
+    'WindSpeed1ms','WindSpeed2ms','WindDirection1deg','WindDirection2deg',...
+    'AirPressurehPa','SnowHeight1m','SnowHeight2m','IceTemperature1C',...
+    'IceTemperature2C','IceTemperature3C','IceTemperature4C','IceTemperature5C',...
+    'IceTemperature6C','IceTemperature7C','IceTemperature8C','IceTemperature9C',...
+    'IceTemperature10C','BatteryVoltageV','aux1Wm2','aux2Wm2','NetRadMaxWm',...
+    'MaxAirTemperture1degC','MaxAirTemperture2degC','MinAirTemperture1degC',...
+    'MinAirTemperture2degC', 'MaxWindspeed1ms', 'MaxWindspeed2ms', ...
+    'StdDevWindspeed1ms', 'StdDevWindspeed2ms', 'RefTemperaturedegC',...
+    'Windspeed2mms', 'Windspeed10mms', 'WindSensorHeight1m', ...
+    'WindSensorHeight2m', 'Albedo', 'ZenithAngledeg', 'QCl01_08',...
+    'QCl09_16', 'QCl17_24', 'QCl25_27'};
+    otherwise
+        error('Wrong variable list for %s.',station)
+end
+
+% renaming the fields according to the PROMICE standards
+data = table(dataArray{1:end-1}, 'VariableNames', list_var);
+
+clearvars  delimiter startRow formatSpec fileID dataArray ans;
+data = standardizeMissing(data,999);
+data(165000:end,:) = [];
+data.time = datenum(data.Year,0,data.JulianTime+1);
+
+ind_remove = find(data.time(2:end)-data.time(1:end-1)<=0);
+% disp('Duplicate timesteps:')
+% disp(ind_remove)
+data(ind_remove,:)=[];
+
+   
+
+% calculating some extra fields
+time_2 = datevec(data.time);
+data.MonthOfTheYear = time_2(:,2);
+data.DayOfTheMonth = time_2(:,3);
+data.HourOfTheDay = time_2(:,4);
+data.DayOfTheYear = floor(data.JulianTime+1);
+data.JulianTime = floor(data.JulianTime)+ data.HourOfTheDay/24;
+clearvars time_2
+
+
+%% Extra files from CP1
     if strcmp(station,'CP1')
     
         % Loading first annexe data file
@@ -249,29 +278,7 @@ if size(filename,1)~=0
         data = data_new;
         clearvars data_2 data_new ind_1 ind_2 time_2
     end
-  
-    data.TemperatureSensorHeight1m = data.WindSensorHeight1m;
-    data.TemperatureSensorHeight2m = data.WindSensorHeight2m;
-    data.HumiditySensorHeight1m = data.WindSensorHeight1m;
-    data.HumiditySensorHeight2m = data.WindSensorHeight2m;
     
-    % temperature to degC
-    for i = 1:length(data.Properties.VariableNames)
-        if ~isempty(strfind(data.Properties.VariableNames{i},'emperatur'))
-            data.(data.Properties.VariableNames{i}) = ...
-               data.(data.Properties.VariableNames{i}) -273.15;
-        end
-    end
-    
-    % pressure to hPa
-    data.AirPressurehPa = data.AirPressurehPa/100;
-else
-    warning('Using text AWS data file')
-    [data] = ImportGCnetData_old(station);
-end
-
-end
-
 %% Dealing with the missing instrument heights
 % sometimes snow height is available and not sensor height
 % for those period we recalculate sensor height based on a guess of the
@@ -311,7 +318,10 @@ end
 % legend('reconstructed','available')
 
 % Creating other heights
-
+data.TemperatureSensorHeight1m = data.WindSensorHeight1m;
+data.TemperatureSensorHeight2m = data.WindSensorHeight2m;
+data.HumiditySensorHeight1m = data.WindSensorHeight1m;
+data.HumiditySensorHeight2m = data.WindSensorHeight2m;
 
 % figure
 % plot(data.WindSpeed1ms)
@@ -326,3 +336,5 @@ end
 % plot(ylimit,ylimit,'--k')
 % 
 % legend('1','2')
+
+end
