@@ -1,4 +1,4 @@
-Weather station processing toolchain
+# Weather station processing toolchain
 
 Baptiste Vandecrux
 bav@geus.dk
@@ -12,6 +12,7 @@ Vandecrux, B., Fausto, R. S., Box, J.E., van As, D., Colgan, W., Langen, P. L., 
 
 =====================================
 
+## Description of the scripts
 The scripts do:
 - Automated filetring of suspicious data
 - Manual removal of suspicious data according to the information listed in Input\ErrorData_AllStations.xlsx
@@ -25,10 +26,10 @@ The scripts do:
 
 =====================================
 
-Getting the scripts running
+## Getting the scripts running
 
 1. Download the all scripts from GitHub
-2. Download a weather data file from PROMICE and place it in \Input\PROMICE. For exemple: https://promice.org/PromiceDataPortal/api/download/f24019f7-d586-4465-8181-d4965421e6eb/v03/hourly/csv/CEN_hour_v03.txt or more generally from https://www.promice.org/PromiceDataPortal/
+2. Download a weather data file from PROMICE and place it in \Input\PROMICE. For exemple: https://promice.org/PromiceDataPortal/api/download/f24019f7-d586-4465-8181-d4965421e6eb/v03/hourly/csv/KAN_M_hour_v03.txt or more generally from https://www.promice.org/PromiceDataPortal/
 3. Get the secondary weather data and place it in \Input\Secondary data
 4. Get the MODIS albedo grids from https://doi.org/10.22008/promice/data/modis_greenland_albedo and place them in \Input\Albedo. 
 5. Get the snow-pit-derived SWE file "Greenland_snow_pit_SWE.xlsx" from bav@geus.dk and place it in the Input folder
