@@ -13,7 +13,8 @@ end
 try data_AVHRR = LoadAVHRRalbedo(station);
 catch me
     disp('WARNING: AVHRR data not found')
-    data_AVHRR = [];
+    data_AVHRR = data_modis;
+    data_AVHRR.albedo = data_modis.time*NaN;
 end
 
 if ~isempty(data_modis)

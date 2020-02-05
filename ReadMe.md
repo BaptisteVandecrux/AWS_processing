@@ -2,7 +2,8 @@
 
 Baptiste Vandecrux
 bav@geus.dk
-=====================================
+
+## Reference
 
 These scripts contain the processing steps used for the preparation of the data for the followng studies:
 
@@ -10,7 +11,6 @@ Vandecrux B, Fausto RS, Langen PL, Van As D, MacFerrin M, Colgan WT, Ingeman-Nie
 
 Vandecrux, B., Fausto, R. S., Box, J.E., van As, D., Colgan, W., Langen, P. L., Haubner, K., Ingeman-Nielsen, T., Heilig,, A., Stevens, C. Max, MacFerrin, M., Niwano, M., Steffen, K.: Firn cold content evolution at nine sites on the Greenland ice sheet since 1998, submitted to Journal of Glaciology
 
-=====================================
 
 ## Description of the scripts
 The scripts do:
