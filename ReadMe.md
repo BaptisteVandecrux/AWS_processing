@@ -8,6 +8,8 @@ bav@geus.dk
 These scripts contain the processing steps used for the preparation of the data for the followng studies:
 
 Vandecrux B, Fausto RS, Langen PL, Van As D, MacFerrin M, Colgan WT, Ingeman-Nielsen T, Steffen K, Jensen NS, Møller MT and Box JE (2018) Drivers of Firn Density on the Greenland Ice Sheet Revealed by Weather Station Observations and Modeling. J. Geophys. Res. Earth Surf. 123(10), 2563–2576 (doi:10.1029/2017JF004597)
+Useful information about the gap-filling in the Supplementary Material:
+https://agupubs.onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1029%2F2017JF004597&file=jgrf20920-sup-0001-2017JF004597-SI.pdf
 
 Vandecrux, B., Fausto, R. S., Box, J.E., van As, D., Colgan, W., Langen, P. L., Haubner, K., Ingeman-Nielsen, T., Heilig,, A., Stevens, C. Max, MacFerrin, M., Niwano, M., Steffen, K.: Firn cold content evolution at nine sites on the Greenland ice sheet since 1998, submitted to Journal of Glaciology
 
@@ -24,13 +26,11 @@ The scripts do:
 - Convert the surface height increase into snow accumulation at the surface using a list of snow-pit-observed snow water equivalent.
 - Output the whole dataset in csv file
 
-=====================================
-
 ## Getting the scripts running
 
-1. Download the all scripts from GitHub
+1. Download all the scripts from GitHub
 2. Download a weather data file from PROMICE and place it in \Input\PROMICE. For exemple: https://promice.org/PromiceDataPortal/api/download/f24019f7-d586-4465-8181-d4965421e6eb/v03/hourly/csv/KAN_M_hour_v03.txt or more generally from https://www.promice.org/PromiceDataPortal/
-3. Get the secondary weather data and place it in \Input\Secondary data
-4. Get the MODIS albedo grids from https://doi.org/10.22008/promice/data/modis_greenland_albedo and place them in \Input\Albedo. 
+3. Get the secondary weather data from bav@geus.dk and place it in \Input\Secondary data
+4. Get the MODIS albedo grids from https://doi.org/10.22008/promice/data/modis_greenland_albedo and place them in \Input\Albedo. Update: due to format issue you need to get these from bav@geus.dk
 5. Get the snow-pit-derived SWE file "Greenland_snow_pit_SWE.xlsx" from bav@geus.dk and place it in the Input folder
 6. (optional) for the stations of interest, get a sublimation estimate from a Surface Energy Balance Model and place it in the Input\Sublimation estimates folder. File should be named "<station_name>_sublimation.txt". A SEB model is available at https://github.com/BaptisteVandecrux/SEB_Firn_model
