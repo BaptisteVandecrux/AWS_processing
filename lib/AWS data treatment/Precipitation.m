@@ -67,7 +67,8 @@ switch c.precip_scheme
             
         % Loading the snowpit dataset and selecting the snowpits available
         % at the station of interest
-        [pit_data, subl] = ImportSnowpitData(c);
+        [pit_data] = ImportSnowpitData();
+        [subl] = ImportSublimationEstimate(c,time);
 
         if strcmp(c.station,'DYE-2_long')
             ind = strcmp(pit_data.Station,'DYE-2');

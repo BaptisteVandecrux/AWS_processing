@@ -1,12 +1,7 @@
-Output
-Side studies
-Input/GCnet/10102018
-Input/GCnet/old data
-Input/GCnet/Additional files sent by Koni
-Input/HIRHAM
-Input/other station
-Input/PROMICE
-Input/Sublimation estimates
-Input/Wenshan
-Input/Greenland_snow_pit_SWE_jeb.xlsx
-GC-Net metadata
+Output/*
+Input/Albedo/*
+Input/GCnet/*
+Input/Secondary data/*
+Input/Sublimation estimates/*
+Input/PROMICE/*
+Input/Greenland_snow_pit_SWE.xlsx

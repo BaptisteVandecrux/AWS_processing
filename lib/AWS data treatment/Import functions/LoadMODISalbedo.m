@@ -1,6 +1,6 @@
 function [data_modis] = LoadMODISalbedo(is_GCnet,station)
 if is_GCnet
-    filename = '..\..\Data\MODIS_C6\ALL_YEARS_MOD10A1_C6_500m_d_nn_daily.txt';
+    filename = 'Input\Albedo\ALL_YEARS_MOD10A1_C6_500m_d_nn_daily.txt';
 
     formatSpec = '%2f%5f%4f%f%[^\n\r]';
     fileID = fopen(filename,'r');
@@ -10,7 +10,7 @@ if is_GCnet
         {'station','year','day','albedo'});
     clearvars filename formatSpec fileID dataArray ans;
     
-    filename = 'Input\GCnet\Gc-net_documentation_Nov_10_2000.csv';
+    filename = 'Input\Albedo\Gc-net_documentation_Nov_10_2000.csv';
     delimiter = ';';
     formatSpec = '%s%s%s%s%s%[^\n\r]';
     fileID = fopen(filename,'r');
@@ -95,7 +95,7 @@ if is_GCnet
     end
 else
     % Loading MODIS data
-    filename = '..\..\Data\MODIS_C6\data\ALL_YEARS_MOD10A1_C6_500m_d_nn_at_PROMICE_daily_columns_cumulated.txt';
+    filename = 'Input\Albedo\ALL_YEARS_MOD10A1_C6_500m_d_nn_at_PROMICE_daily_columns_cumulated.txt';
 
     formatSpec = '%4f%4f%9f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%8f%f%[^\n\r]';
 
@@ -106,7 +106,7 @@ else
     clearvars filename formatSpec fileID dataArray ans;
     
 %     Loading station codes
-    filename = '..\..\Data\MODIS_C6\data\PROMICE station codes.txt';
+    filename = 'Input\Albedo\PROMICE station codes.txt';
     delimiter = ' ';
     formatSpec = '%*s%*s%*s%s%s%*s%*s%s%*s%*s%s%[^\n\r]';
     fileID = fopen(filename,'r');

@@ -5,10 +5,18 @@ function [data, data_modis] = fill_SWup_using_MODIS_albedo(...
 % missing upward shortwave radiation
     
 % Uploading MODIS albedo data
-data_modis = LoadMODISalbedo(is_GCnet,station);
-data_AVHRR = LoadAVHRRalbedo(station);
+try data_modis = LoadMODISalbedo(is_GCnet,station);
+catch me
+    disp('WARNING: MODIS data not found')
+    data_modis = [];
+end
+try data_AVHRR = LoadAVHRRalbedo(station);
+catch me
+    disp('WARNING: AVHRR data not found')
+    data_AVHRR = [];
+end
 
-if or(~isempty(data_modis),~isempty(data_AVHRR))
+if ~isempty(data_modis)
     
     %% station, MODIS and AVHRR albedo climatology
     avg_modis = NaN(1,365);
@@ -47,7 +55,7 @@ if or(~isempty(data_modis),~isempty(data_AVHRR))
     end
     albedo_avg_station(isnan(albedo_avg_station)) = 0.8;
 
-%% Plotting climatologies
+    %% Plotting climatologies
     f = figure('Visible',vis);
     [ha, ~] = tight_subplot(1, 3, 0.1, [0.15 0.15], 0.1);
     set(f,'CurrentAxes',ha(1))

@@ -16,7 +16,7 @@ vis = 'off';
 
 % Plot comparisons of AWS data with RCM data, which is used
 % to fill data gaps ('no' or 'yes')
-PlotGapFill = 'no';
+PlotGapFill = 'yes';
 
 % Using tilt correction from jaws
 tilt_correct = 'yes';
@@ -37,7 +37,7 @@ warning('off','MATLAB:print:CustomResizeFcnInPrint')
 T_0 = 273.15;
 
 % select station here
-station_list = {'GITS'}; %{Stationname{15:24}};
+station_list = {'KAN_M'}; %{Stationname{15:24}};
 
 % it is also possible to loop through all or part of the PROMICE stations
 % here loading a station list:
@@ -45,9 +45,8 @@ station_list = {'GITS'}; %{Stationname{15:24}};
 % station_list = {Stationname{15:24}};
 
 % Choice RCM
-RCM_list = {'RACMO','CanESM_rcp26','CanESM_rcp45','CanESM_rcp85'};
-for kk = 1:length(RCM_list)
-    RCM = RCM_list{kk};
+RCM = 'RACMO';
+
 %% start looping through station list
 for i = 1: length(station_list)
     station = station_list{i};
@@ -555,4 +554,4 @@ disp('--------------------')
 	disp('')
     
 end
-end
+
