@@ -139,12 +139,17 @@ switch station
             LoadDataSummit(OutputFolder,vis);
 
     case 'KAN_U'
-        sec_stations_names{1} = 'KANUbabis';
-        data_sec_stations{1} = LoadDataKANUbabis() ;
-    
+        try data_sec_stations{1} = LoadDataKANUbabis() ;
+            sec_stations_names{1} = 'KANUbabis';
+        catch me
+            disp('NUK_K can be gap-filled with KOB station. Contact bav@geus.dk for more info.')
+        end
     case 'NUK_K'
-        sec_stations_names{1} = 'KOB';
-        data_sec_stations{1} = LoadDataKOB(OutputFolder,vis) ;
+        try data_sec_stations{1} = LoadDataKOB(OutputFolder,vis) ;
+            sec_stations_names{1} = 'KOB';
+        catch me
+            disp('NUK_K can be gap-filled with KOB station. Contact bav@geus.dk for more info.')
+        end
 end
 clearvars ind
 

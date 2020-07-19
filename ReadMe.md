@@ -26,11 +26,25 @@ The scripts do:
 - Convert the surface height increase into snow accumulation at the surface using a list of snow-pit-observed snow water equivalent.
 - Output the whole dataset in csv file
 
-## Getting the scripts running
 
-1. Download all the scripts from GitHub
-2. Download a weather data file from PROMICE and place it in \Input\PROMICE. For exemple: https://promice.org/PromiceDataPortal/api/download/f24019f7-d586-4465-8181-d4965421e6eb/v03/hourly/csv/KAN_M_hour_v03.txt or more generally from https://www.promice.org/PromiceDataPortal/
-3. Get the secondary weather data from bav@geus.dk and place it in \Input\Secondary data
-4. Get the MODIS albedo grids from https://doi.org/10.22008/promice/data/modis_greenland_albedo and place them in \Input\Albedo. Update: due to format issue you need to get these from bav@geus.dk
-5. Get the snow-pit-derived SWE file "Greenland_snow_pit_SWE.xlsx" from bav@geus.dk and place it in the Input folder
-6. (optional) for the stations of interest, get a sublimation estimate from a Surface Energy Balance Model and place it in the Input\Sublimation estimates folder. File should be named "<station_name>_sublimation.txt". A SEB model is available at https://github.com/BaptisteVandecrux/SEB_Firn_model
+## Getting started
+* Download the GitHub repository to your computer
+* Download an AWS data file from (PROMICE web site)[https://promice.org/] for example [KAN_M](https://promice.org/PromiceDataPortal/api/download/f24019f7-d586-4465-8181-d4965421e6eb/v03/hourly/csv/KAN_M_hour_v03.txt)
+* Place the RCM gap-filling file RACMO_3h_AWS_sites.nc (get from bav@geus.dk) in the Input/Secondary data
+* Place the snow pit data file (Greenland_snow_pit_SWE.xlsx, get from bav@geus.dk) in the Input folder
+* Place the MODIS albedo file (ALL_YEARS_MOD10A1_C6_500m_d_nn_at_PROMICE_daily_columns_cumulated.txt, get from bav@geus.dk) in the Input/Albedo folder
+* (optional) for the stations of interest, get a sublimation estimate from a Surface Energy Balance Model and place it in the Input\Sublimation estimates folder. File should be named "<station_name>_sublimation.txt". A SEB model is available at https://github.com/BaptisteVandecrux/SEB_Firn_model
+* Open AWS_DataTreatment.m in Matlab
+Change the station code name to process if needed:
+```
+% select station here
+station_list = {'KAN_M'}; 
+```
+* Run the AWS_DataTreatment.m scripts
+
+## Defining erroneous periods
+
+## Adding maintenance information
+
+## Working on a different time period
+
