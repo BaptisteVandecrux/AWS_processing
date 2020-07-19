@@ -43,8 +43,46 @@ station_list = {'KAN_M'};
 * Run the AWS_DataTreatment.m scripts
 
 ## Defining erroneous periods
+After running the main script, an overview of the data is saved as "WeatherData_2.pdf". From that plot, the data can be inspected and period of instrument malfunction can be spotted. If we say that we find, for the example, the air pressure suspicious during 2011, we have the possibility to remove it.
+
+For this, open Input/ErrorData_AllStations.xlsx, create a sheet named "KAN_M" and add a line with
+AirPressurehPa | 01-01-2011 00:00:00	| 31-12-2011 00:00:00
+
+Save and close. Rerun the AWS_DataTreatment script. The data has now been removed and replaced by RCM data.
+
+The variable names that should be used are:
+```
+AirPressurehPa	AirPressurehPa_Origin	AirTemperature1C	
+AirTemperature1C_Origin	AirTemperature2C	AirTemperature2C_Origin	RelativeHumidity1	RelativeHumidity1_Origin	RelativeHumidity2	RelativeHumidity2_Origin	WindSpeed1ms	
+WindSpeed1ms_Origin	WindSpeed2ms	WindSpeed2ms_Origin	WindDirection1d	WindDirection2d	
+ShortwaveRadiationDownWm2	ShortwaveRadiationDownWm2_Origin	ShortwaveRadiationUpWm2	
+ShortwaveRadiationUpWm2_Origin	Albedo	LongwaveRadiationDownWm2	
+LongwaveRadiationDownWm2_Origin	LongwaveRadiationUpWm2	LongwaveRadiationUpWm2_Origin	
+HeightSensorBoomm	HeightStakesm	IceTemperature1C	IceTemperature2C	IceTemperature3C	
+IceTemperature4C	IceTemperature5C	IceTemperature6C	IceTemperature7C	
+IceTemperature8C	time	HeightWindSpeed1m	HeightWindSpeed2m	HeightTemperature1m	
+HeightTemperature2m	HeightHumidity1m	HeightHumidity2m	SurfaceHeightm	Snowfallmweq	
+Rainfallmweq	DepthThermistor1m	DepthThermistor2m	DepthThermistor3m	DepthThermistor4m	
+DepthThermistor5m	DepthThermistor6m	DepthThermistor7m	DepthThermistor8m
+```
 
 ## Adding maintenance information
+Maintenance information can be used to check that the instrument heights in the data files agree with the manual measurements done manually during maintenance visits.
+They also inform the script of the initial depth of ice temperature sensor.
+Finally, since the sureface height is calculated from the instrument height, which some times can be moved up or down during maintenance, the maintenance file allows to correct those shifts to reconstruct a continuous surface height.
+
+To enter this information open Input/maintenance.xlsx and create a sheet for "KAN_M".
+Copy the header from another sheet and paste it in the current sheet.
+The first maintenance is the installation of the station. For KAN_M we can use the first valid day in the data file: 02-09-2008  00:00:00. We can then fill up the next columns with information from maintenance reports or knowledge inferred from other observation. For a start we can give the default values to the ice temperature sensors (NewDepth1..10): from 0.1 to 9.1 with 1 m spacing. The other cells can be left empty.
+
 
 ## Working on a different time period
-
+If the project is focusing on a specific time period, or if you need to restrict the data file to the period when the RCM is available, the processing period can be changed:
+In the AWS_DataTreatment script, section "Cropping at defined periods"
+Add after "switch station" the following case:
+```
+        case 'KAN_M'
+	    time_start = datenum('02-Sept-2011 00:00:00');
+	    time_end = datenum('31-Dec-2018 00:00:00');
+```		
+Save and re-run, only this period will be processed.
