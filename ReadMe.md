@@ -53,7 +53,8 @@ Save and close. Rerun the AWS_DataTreatment script. The data has now been remove
 The variable names that should be used are:
 ```
 AirPressurehPa	AirPressurehPa_Origin	AirTemperature1C	
-AirTemperature1C_Origin	AirTemperature2C	AirTemperature2C_Origin	RelativeHumidity1	RelativeHumidity1_Origin	RelativeHumidity2	RelativeHumidity2_Origin	WindSpeed1ms	
+AirTemperature1C_Origin	AirTemperature2C	AirTemperature2C_Origin	RelativeHumidity1	
+RelativeHumidity1_Origin	RelativeHumidity2	RelativeHumidity2_Origin	WindSpeed1ms	
 WindSpeed1ms_Origin	WindSpeed2ms	WindSpeed2ms_Origin	WindDirection1d	WindDirection2d	
 ShortwaveRadiationDownWm2	ShortwaveRadiationDownWm2_Origin	ShortwaveRadiationUpWm2	
 ShortwaveRadiationUpWm2_Origin	Albedo	LongwaveRadiationDownWm2	
@@ -83,6 +84,6 @@ Add after "switch station" the following case:
 ```
         case 'KAN_M'
 	    time_start = datenum('02-Sept-2011 00:00:00');
-	    time_end = datenum('31-Dec-2018 00:00:00');
+	    time_end = datenum('31-Dec-2017 00:00:00');
 ```		
 Save and re-run, only this period will be processed.
